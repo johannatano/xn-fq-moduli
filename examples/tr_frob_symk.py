@@ -1,0 +1,138 @@
+from __future__ import annotations
+import time
+from math import comb, gcd
+
+from xnfq.config import apply_config_from_args
+from xnfq.moduli.level_structures import Gamma, Gamma0, Gamma1
+from xnfq.moduli.modular_curve import ModularCurve, X, X0, X1
+from xnfq.arithmetic.function import phi
+from xnfq.arithmetic.common import kronecker
+
+from utils.args import parse_example_args
+from utils.fmt import fmt_magnitude
+from utils.lmfdb_api import fetch_traces
+
+from utils.logging import Logger, Colors
+
+
+"""
+def hk(t: int, q: int, k: int) -> int:
+    return sum(comb(k - j, j) * (-q) ** j * t ** (k - 2 * j) for j in range(k // 2 + 1))
+
+def tr_frob_symk(x1n, k: int) -> int:
+    val = 0
+    #TODO: not sure if this always holds?
+    if k == 0:
+        val = x1n.q + (1 if gcd(x1n.q, x1n.N) == 1 else 0)
+    curves_term = sum(hk(c.t, x1n.q, k) * c.count() for c in x1n.yfq())
+    cusp_term = sum((c.t ** (k + 2)) * c.count() for c in x1n.cusps())
+    return val - curves_term - cusp_term"""
+
+
+def run():
+    args = parse_args()
+    apply_config_from_args(args)
+    p = args.p
+    n = args.n
+    N = args.N
+    q = p ** n
+
+    fast_trace = args.fast_trace
+    using_pari = args.use_pari if hasattr(args, "use_pari") else False
+    Logger.cprint(
+        f"Computing S_{args.k+2}(Frob_{q} | Sym^{args.k}) | Optimized trace enum: {fast_trace} | Using PARI: {using_pari} | q mag={fmt_magnitude(q)}",
+        Colors.HEADER,
+    )
+
+    start_t = time.time()
+    q = p**n
+    k = args.k
+    # X1Fq = ModularCurve(Gamma1(N)).over(p, n)
+    mod_curve = None
+    if args.type == 1:
+        mod_curve = X1(N).over(p, n)#ModularCurve(Gamma1(N)).over(p, n)
+    elif args.type == 0:
+        mod_curve = X0(N).over(p, n)
+    else:
+        mod_curve = X(N).over(p, n)
+
+    trace = mod_curve.tr_frob_symk(args.k)
+
+    # structure = mod_curve.get_structure()
+
+    """debug_sum = 0
+    for s_rec in structure.fibers:
+        if s_rec.kind != "weil":
+            Logger.cprint(
+                f"CUSP fiber info: t={s_rec.trace}, d={s_rec.d}, total_count={s_rec.total_count}",
+                Colors.RED,
+            )
+            continue
+        clr = Colors.CYAN
+        if s_rec.total_count == 0:
+            continue
+        t = s_rec.trace
+        hk = mod_curve.hk(t, q, k)
+        '''Logger.cprint(
+            f"Weil fiber info:{s_rec.discriminant}, t={s_rec.trace}, total_mass={s_rec.total_mass}, total_count={s_rec.total_count}, hk={hk}",
+            clr,
+        )'''
+        debug_sum += hk*s_rec.total_count
+        for level_rec in s_rec.level_records:
+            clr = (
+                Colors.GREEN
+                if level_rec.full
+                else Colors.RED if level_rec.cyclic == 0 else Colors.YELLOW
+            )
+            #Logger.cprint(f"Level record:{level_rec}", clr)
+    #Logger.cprint(f"Debug sum: {debug_sum}", Colors.MAGENTA)
+    # trace0 = mod_curve.tr_frob_symk(args.k)"""
+
+    stop_t = time.time()
+
+    ref = None
+    if args.sage:
+
+        from sage.all import (
+            CuspForms,
+            Gamma1 as SageGamma1,
+            Gamma0 as SageGamma0,
+            ModularSymbols,
+            GammaH,
+        )
+
+        start_t_sage = time.time()
+        congruence_subgroup = None
+        if args.type == 1:
+            congruence_subgroup = SageGamma1(N)
+            form = CuspForms(congruence_subgroup, args.k + 2)
+            ref = int(form.hecke_operator(q).trace())
+        elif args.type == 0:
+            congruence_subgroup = SageGamma0(N)
+            form = CuspForms(congruence_subgroup, args.k + 2)
+            ref = int(form.hecke_operator(q).trace())
+        else:
+            H = GammaH(N^2, [1 + N])
+            form = CuspForms(H, args.k + 2)
+            ref = int(form.hecke_operator(q).trace())
+
+        stop_t_sage = time.time()
+        error = abs(trace - ref)
+        clr = Colors.GREEN if error == 0 else Colors.RED
+        Logger.cprint(f"Result: trace={trace}, sage ref={ref}, error={error}, time={(stop_t - start_t):.9f}, sage time={(stop_t_sage - start_t_sage):.9f}", clr)
+    else:
+        error = None
+        clr = Colors.GREEN
+        Logger.cprint(
+            f"Result: trace={trace}, time={(stop_t - start_t):.9f}", clr
+        )
+
+
+def parse_args():
+    return parse_example_args(
+        "Compute Tr Sym^k on X1(N)", include_sym_power=True, include_sage=True
+    )
+
+
+if __name__ == "__main__":
+    run()

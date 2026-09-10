@@ -36,7 +36,6 @@ class EigenTrace:
     trace: int
     base_form: BinaryQuadraticForm
     eigenvalues: dict[int, EigenValues] = field(default_factory=dict)
-
     def survives(self) -> bool:
         return all(not data.is_empty() for data in self.eigenvalues.values())
 
@@ -317,15 +316,12 @@ def enum_weil_q(curve: "ModularCurveFq") -> list[WeilDatum]:
         surviving = [
             trace_data for trace_data in eigenforms.values() if trace_data.survives()
         ]
-        
         if not surviving:
             return []
-
         #DK, f = base_form.to_D0_basis()
         # NOTE: We only construct ONE tower and reuse, since L(pi)=L(-pi) in tower structure, and it is expensive to find D0.
         DK, f = BinaryQuadraticForm._D0(base_form.discriminant, pari=pari)
         tower = LatticeTower(DK, f, base_form, exclude=p)
-
         return [(trace_data.trace, tower, trace_data) for trace_data in surviving]
 
     # in the case of Gamma1, we might speed up t^2 <= 4q enumeration by solving explicit residues for pm(q+1) % N

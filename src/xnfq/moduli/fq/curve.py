@@ -63,8 +63,8 @@ class ModularCurveFq(ModularCurve):
         """Yield cusp fibers allowed by the level structure over `F_q`."""
         from .cusp_fibers import CuspFqFiber, enum_d_gons
 
-        for t, dgon in enum_d_gons(self, self.level_structure.type):
-            yield CuspFqFiber(self.level_structure, t, dgon)
+        for t, dgon, eigen_vals in enum_d_gons(self, self.level_structure.type):
+            yield CuspFqFiber(self.level_structure, t, dgon, eigen_vals)
 
     def hk(self, t: int, q: int, k: int) -> int:
         """Trace polynomial for the `k`th symmetric power at Frobenius trace `t`."""
@@ -81,9 +81,6 @@ class ModularCurveFq(ModularCurve):
         curves_term = sum(self.hk(c.t, self.q, k) * c.count() for c in self.smooth_fibers())
         cusp_term = sum((c.t ** (k + 2)) * c.count() for c in self.cusps())
 
-        for c in self.cusps():
-            print(f"cusp: t={c.t}, d={c.dgon.d}, count={c.count()}, w={c.t ** (k + 2) * c.count()}")
-            
         print(
             f"val={val}, curves_term={curves_term}, cusp_term={cusp_term}"
         )

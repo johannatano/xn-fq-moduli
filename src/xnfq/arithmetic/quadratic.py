@@ -275,7 +275,6 @@ class QuadraticOrderElement:
             raise ValueError("basis change requires elements from the same ambient field")
 
         gen_u, gen_v = generator.maximal_order_coords
-        print(f"Generator maximal order coords: {gen_u}, {gen_v}")
         if gen_v == 0:
             return self.coords
             raise ValueError("generator must be non-rational to define a quadratic basis")

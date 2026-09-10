@@ -125,3 +125,9 @@ class NumberField(FieldExtension):
 class NeronDgon(AbGrp):
     def __init__(self, d: int):
         self.d = d
+
+    def torsion_subgroup(self, n: int) -> "NeronDgon":
+        """Return the n-torsion subgroup of the NeronDgon."""
+        if n % self.d != 0:
+            return (0,0)
+        return (n // self.d, self.d)

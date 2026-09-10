@@ -65,10 +65,10 @@ def coprime_part(n: int, m: int) -> int:
 
 def factorize(n):
     """Return list of (prime, exponent) pairs for n > 1."""
-    #if pari:
-    #return list(pari.factorint(n).items())
-    #    from sympy import factorint
-    #    return list(factorint(n).items())
+    if pari:
+        return list(pari.factorint(n).items())
+        #from sympy import factorint
+        #return list(factorint(n).items())
     factors = []
     d = 2
     while d * d <= n:

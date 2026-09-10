@@ -117,8 +117,26 @@ class BinaryQuadraticForm(Form):
 
     def shift(self, a: int) -> "BinaryQuadraticForm":
         """Translate the form by `x -> x + a y`.
-
         For a monic form `(1, t, n)`, this is the norm form of the shifted
         element `pi + a`.
         """
         return type(self)(self.A, self.B + 2 * self.A * a, self.A * a * a + self.B * a + self.C)
+
+    def to_D0_basis(self) -> "BinaryQuadraticForm":
+        if self.C == 0:
+            return (0, 0)
+        h = self.B // 2
+        trace_zero_form = self.shift(-h) # we move to (1,{0,1}, N')
+        even_parity = trace_zero_form.B % 2 == 0
+        _D0 = 1
+        _c = 1
+        # reduced discr, remove 4 factor, so either odd or we add abck 4 later
+        disc = trace_zero_form.C if even_parity else (1 - 4 * trace_zero_form.C)
+        for l, a in factorize(abs(disc)):
+            c_exp = a // 2
+            d_exp = a % 2
+            _c *= l ** c_exp
+            _D0 *= l ** d_exp
+        if even_parity:
+            _D0 *= 4
+        return (-_D0, _c)

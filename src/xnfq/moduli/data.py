@@ -32,6 +32,7 @@ class LevelStructureRecord:
 class EigenFormRecord:
     """A global eigenvalue together with its local structure across all primes."""
     eigenform: EigenForm
+    base_form: "BinaryQuadraticForm"
     level_records: tuple[LevelStructureRecord, ...] = ()
 
 @dataclass(frozen=True)

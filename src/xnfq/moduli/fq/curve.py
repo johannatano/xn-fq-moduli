@@ -80,4 +80,5 @@ class ModularCurveFq(ModularCurve):
             val = self.q + (1 if gcd(self.q, self.N) == 1 else 0)
         curves_term = sum(self.hk(c.t, self.q, k) * c.count() for c in self.smooth_fibers())
         cusp_term = sum((c.t ** (k + 2)) * c.count() for c in self.cusps())
+        print(f"val={val}, curves_term={curves_term}, cusp_term={cusp_term}")
         return val - curves_term - cusp_term

@@ -13,7 +13,7 @@ from utils.fmt import fmt_magnitude
 from utils.lmfdb_api import fetch_traces
 
 from utils.logging import Logger, Colors
-
+from sympy import primerange
 
 """
 def hk(t: int, q: int, k: int) -> int:
@@ -37,6 +37,11 @@ def run():
     N = args.N
     q = p ** n
 
+    primes = list(primerange(2, 500))
+    for _p in primes:
+        if (_p-1) % N == 0:
+            Logger.cprint(f"Prime {_p} satisfies (p-1) % N={(_p-1) % N}, (q-1) % N={(q-1) % N}", Colors.GREEN)
+
     fast_trace = args.fast_trace
     using_pari = args.use_pari if hasattr(args, "use_pari") else False
     Logger.cprint(
@@ -55,6 +60,7 @@ def run():
         mod_curve = X0(N).over(p, n)
     else:
         mod_curve = X(N).over(p, n)
+        print(f"mod_curve={mod_curve}, curve_q={mod_curve.q}, p={p}, n={n}")
 
     trace = mod_curve.tr_frob_symk(args.k)
 
@@ -112,7 +118,7 @@ def run():
             form = CuspForms(congruence_subgroup, args.k + 2)
             ref = int(form.hecke_operator(q).trace())
         else:
-            H = GammaH(N^2, [1 + N])
+            H = GammaH(N**2, [1 + N])
             form = CuspForms(H, args.k + 2)
             ref = int(form.hecke_operator(q).trace())
 

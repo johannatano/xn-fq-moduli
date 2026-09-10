@@ -30,6 +30,8 @@ class phi(Multiplicative):
         return r'''
 
     def __call__(self, f):
+        if f == 0:
+            return 0
         value = 1
         for p, a in factorize(f):
             value *= p ** (a - 1) * (p - self.chi(p))

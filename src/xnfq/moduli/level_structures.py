@@ -1,7 +1,10 @@
+from ..arithmetic.function import phi
+
 class LevelStructure:
     """Abstract level-structure descriptor used by the counting code."""
 
     def __init__(self, N: int):
+        from ..arithmetic.function import phi
         self.N = N
         self._class = None
         self._scalar_only = False
@@ -17,6 +20,10 @@ class LevelStructure:
     @property
     def scalar_only(self) -> bool:
         return self._scalar_only
+    
+    @property
+    def weight(self) -> int:
+        return 1
 
 
 class Gamma0(LevelStructure):
@@ -37,6 +44,11 @@ class Gamma1(LevelStructure):
     def eigenvalues(self, m: int) -> list[int]:
         return [1]
 
+    @property
+    def weight(self) -> int:
+        return phi(1)(self.N)
+
+
 class Gamma(Gamma1):
     """Full level structure, restricted to scalar-compatible eigenvalues."""
 
@@ -44,3 +56,7 @@ class Gamma(Gamma1):
         super().__init__(N)
         self._class = 2
         self._scalar_only = True
+        
+    @property
+    def weight(self) -> int:
+        return self.N*phi(1)(self.N)

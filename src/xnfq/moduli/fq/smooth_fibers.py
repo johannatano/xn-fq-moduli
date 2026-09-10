@@ -90,14 +90,14 @@ class WeilqFiber(CurveFiber):
         # elif self.gamma.type == 2:
         #    total_val = 0  # we only want max
         if True:  # we have partial inclusion, we have to check each eigenvalue
-            total_val = 0
+            val = 0
             for lam in eigen_data.values:
                 pi_local_shifted = pi_local.shift(-lam)
-                total_val += self.stable_lines_count(l, a, pi_local_shifted)
+                val += self.stable_lines_count(l, a, pi_local_shifted)
                 """print(
                     f"lam={lam}, pi_local_shifted={pi_local_shifted.ell_kernel(l, a)}, pi_local_shifted={pi_local_shifted.coords}"
                 )"""
-        return total_val
+        return val
 
     def local_level_record(
         self,
@@ -136,14 +136,6 @@ class WeilqFiber(CurveFiber):
             scalar=scalar,
         )
 
-    def global_structure_count(self) -> int:
-        """Global multiplicity contributed by the chosen level problem."""
-        if self.gamma.type == 1:
-            return phi(1)(self.N)
-        if self.gamma.type == 2:
-            return self.N * phi(1)(self.N)
-        return 1
-
     def local_mass(self, f: int) -> int:
         return self.frob_tower.class_size(f)
 
@@ -155,16 +147,6 @@ class WeilqFiber(CurveFiber):
             for i in range(0, k + 1)
         )
 
-    """def local_structure(self, f: int) -> BicyclicGroup:
-        return self.frob_tower.quotient_group(self.frob_1, f)"""
-    """def tower_quotients(
-        self, element: QuadraticOrderElement
-    ) -> tuple[tuple[int, BicyclicGroup, int], ...]:
-        return tuple(
-            (f, self.local_structure(f), self.local_mass(f))
-            for f in self.frob_tower.conductor_divisors()
-        )"""
-
     def true_count_full(self, l:int) -> int:
         """Compute the unweighted point-count contribution of this smooth fiber."""
         return l**3*(1-Fraction(1, l**2))
@@ -173,13 +155,12 @@ class WeilqFiber(CurveFiber):
         """Compute the weighted point-count contribution of this smooth fiber."""
         lattice_sum = (
             prod(self.tower_sum(l, a) for l, a in factorize(self.N))
-            * self.global_structure_count()
             * Phi(
                 self.chi_K,
                 self.frob_tower.max_coprime_conductor(self.N),
             )
         )
-        return lattice_sum * self.m0
+        return lattice_sum * self.m0 * self.gamma.weight
 
     def get_eigen_structure(self) -> tuple[EigenFormRecord, ...]:
         eigen_records: list[EigenFormRecord] = []

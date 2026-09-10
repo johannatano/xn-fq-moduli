@@ -68,44 +68,27 @@ class CuspFqFiber(CurveFiber):
         self.dgon = dgon
         self.eigen_vals = eigen_vals
 
-    def global_structure_count(self) -> int:
-        """Global multiplicity contributed by the chosen level problem."""
-        if self.gamma.type == 1:
-            return phi(1)(self.N)
-        if self.gamma.type == 2:
-            return phi(-1)(self.N) * phi(1)(self.N)
-        return 1
-
     def count(self) -> Fraction:
-        e = self.gamma.N // self.dgon.d
-        g = gcd(e, self.dgon.d)
-        print(f"e={e}, g={g}, eigen_vals={self.eigen_vals}   ")
-        _val = 0
-        for ev in self.eigen_vals:
-            print(f"eigenvalue: {ev}")
-            _val += Fraction(self.dgon.d, g) * phi(1)(g)
-        n1, n2 = self.dgon.fixed_subgroup(self.gamma.N) if self.gamma.type > 0 else self.dgon.stable_subgroup(self.gamma.N)
-        if self.gamma.type > 0 and n1 * n2 < self.gamma.N:
+        val = 0
+
+        
+
+        if self.gamma.type == 2:
+            val = phi(-1)(
+                self.gamma.N
+            )  # we have full torsion, if we are here d=N, e = 1 etc, no mixed heights
+        else:
+            # count varying stable lines counts from eigen values, depends on d
+            e = self.gamma.N // self.dgon.d
+            g = gcd(e, self.dgon.d)
+            val = (
+                len(self.eigen_vals) * Fraction(self.dgon.d, g) * phi(1)(g)
+            )  # num stable lines count
+
             print(
-                f"n1 * n2 < N: n1={n1}, n2={n2}, N={self.gamma.N}, eigen_vals={self.eigen_vals}, _val={_val}"
+                f"d={self.dgon.d}, s={self.dgon.t} lines={val} scaled={Fraction(val, self.dgon.d*2) * self.gamma.weight} g={g}, inv={self.dgon.fixed_subgroup(self.gamma.N)}| #Gamma{self.gamma.type}={val}, eigen_vals={self.eigen_vals}"
             )
-            return Fraction(0, 1)
-        val = phi(1)(n1) * phi(1)(n2)
-
-        if self.gamma.type == 2: # if we are here then d = N and e | q-1 hence full incl
-            val *= phi(-1)(self.gamma.N)
-        clr = Colors.GREEN if val > 0 else Colors.RED
-
-        print(f"_val after scaling: {_val}")
-        _val *= Fraction(1, self.dgon.d) * self.global_structure_count()
-        print(
-            f"-------------_val={_val}, true_val={val}, g={g}, phi(-1)(self.gamma.N)={phi(-1)(self.gamma.N)}, self.N * phi(1)(self.N)={self.N * phi(1)(self.N)}"
-        )
-        Logger.cprint(
-            f"d={self.dgon.d}, s={self.dgon.t} | C^sm_d = {(n1, n2)}, #Gamma{self.gamma.type}={val}, eigen_vals={self.eigen_vals}",
-            clr,
-        )
-        return Fraction(val, 2)
+        return Fraction(val, self.dgon.d*2) * self.gamma.weight
 
     def snapshot(self) -> FiberRecord:
         total = self.count()

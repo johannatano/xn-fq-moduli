@@ -16,13 +16,11 @@ class LevelStructure:
     def eigenvalues(self, m: int) -> list[int]:
         """Return admissible eigenvalue shifts modulo `m`."""
         return list(range(0, m))
-
     @property
     def scalar_only(self) -> bool:
         return self._scalar_only
     
-    @property
-    def weight(self) -> int:
+    def weight(self, smooth: bool = True) -> int:
         return 1
 
 
@@ -33,30 +31,26 @@ class Gamma0(LevelStructure):
         super().__init__(N)
         self._class = 0
 
-
 class Gamma1(LevelStructure):
     """Level structure for a chosen point of exact order `N`."""
-
     def __init__(self, N: int):
         super().__init__(N)
         self._class = 1
-
     def eigenvalues(self, m: int) -> list[int]:
         return [1]
-
-    @property
-    def weight(self) -> int:
+    
+    def weight(self, smooth: bool = True) -> int:
         return phi(1)(self.N)
 
 
 class Gamma(Gamma1):
     """Full level structure, restricted to scalar-compatible eigenvalues."""
-
     def __init__(self, N: int):
         super().__init__(N)
         self._class = 2
         self._scalar_only = True
         
-    @property
-    def weight(self) -> int:
+    def weight(self, smooth:bool = True) -> int:
+        if not smooth:
+            return phi(-1)(self.N) * phi(1)(self.N)
         return self.N*phi(1)(self.N)

@@ -66,13 +66,11 @@ class WeilqFiber(CurveFiber):
         self, l: int, a: int, alpha: QuadraticOrderElement, scalar_only=False
     ) -> int:
         """Count stable lines in the local quotient defined by `alpha`."""
-        # e1 = min(vl(alpha.u, l), vl(alpha.v, l))
-        # e2 = vl(alpha.norm, l) - e1
         e1, e2 = alpha.ell_invariants(l)
         if e2 < a:
             return 0
         if e1 < a:
-            return l**e1 if self.gamma.type != 2 else 0
+            return l**e1
         else:
             return phi(-1)(l**a)
 
@@ -83,20 +81,23 @@ class WeilqFiber(CurveFiber):
         if num_eigen == 0:
             return 0
         pi_local = self.frob_tower.order(f).embed_suborder(self.frob)
+        
+        if self.gamma.type == 2 and vl(pi_local.v, l) < a: # we gate on scalar action, this is not dependeing on the shift, only wheter the w coord is 0 mod N
+            return 0
+        
         # some early exits
         # if self.gamma.type != 1 and vl(pi_local.v, l) >= a:
         #    print(f"pi_local.v valuation at prime {l} is {vl(pi_local.v, l)}")
         #    total_val = phi(-1)(l**a)  # we reach maximum valuation
         # elif self.gamma.type == 2:
         #    total_val = 0  # we only want max
+        
         if True:  # we have partial inclusion, we have to check each eigenvalue
             val = 0
             for lam in eigen_data.values:
                 pi_local_shifted = pi_local.shift(-lam)
                 val += self.stable_lines_count(l, a, pi_local_shifted)
-                """print(
-                    f"lam={lam}, pi_local_shifted={pi_local_shifted.ell_kernel(l, a)}, pi_local_shifted={pi_local_shifted.coords}"
-                )"""
+                print(f"EIGENLINE l={l}, a={a}, lam={lam}, pi_local_shifted={pi_local_shifted}, val={val}")
         return val
 
     def local_level_record(
@@ -160,7 +161,7 @@ class WeilqFiber(CurveFiber):
                 self.frob_tower.max_coprime_conductor(self.N),
             )
         )
-        return lattice_sum * self.m0 * self.gamma.weight
+        return lattice_sum * self.m0 * self.gamma.weight()
 
     def get_eigen_structure(self) -> tuple[EigenFormRecord, ...]:
         eigen_records: list[EigenFormRecord] = []

@@ -289,8 +289,8 @@ class QuadraticOrderElement:
 
         return abs(self.v)
 
-    def shift(self, a: int) -> "QuadraticOrderElement":
-        return type(self)(self.order, (self.u + a, self.v))
+    def shift(self, a: int, b:int = 1) -> "QuadraticOrderElement":
+        return type(self)(self.order, (self.u + a, self.v // b))
 
 
 @dataclass(init=False)

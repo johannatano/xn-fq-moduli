@@ -2,10 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from fractions import Fraction
-from math import prod, sqrt
+from math import prod, sqrt, gcd
 from typing import TYPE_CHECKING
 
-from ...arithmetic.common import factorize, kronecker, legendre, valuation as vl
+from ...arithmetic.common import (
+    factorize,
+    kronecker,
+    legendre,
+    valuation as vl,
+    divisors,
+)
 from ...arithmetic.forms import BinaryQuadraticForm
 from ...arithmetic.function import Phi, phi
 from ...arithmetic.quadratic import BicyclicGroup, LatticeTower, QuadraticOrderElement
@@ -15,6 +21,45 @@ from ..data import EigenForm, EigenFormRecord, FiberRecord, LevelStructureRecord
 from ..modular_curve import CurveFiber
 
 from ..level_structures import LevelStructure
+
+def radical(n: int) -> int:
+    """Product of distinct prime factors of n: rad(n) = prod_{p | n} p."""
+    if n <= 1:
+        return 1
+    rad = 1
+    d = 2
+    temp = n
+    while d * d <= temp:
+        if temp % d == 0:
+            rad *= d
+            while temp % d == 0:
+                temp //= d
+        d += 1
+    if temp > 1:
+        rad *= temp
+    return rad
+
+
+def saturated_core(g: int, m: int) -> int:
+    """Removes from g all prime factors that divide m."""
+    h = gcd(g, m)
+    while h > 1:
+        g //= h
+        h = gcd(g, h)
+    return g
+
+
+def n_part(v: int, N: int) -> int:
+    """Extracts the part of v divisible only by primes dividing N."""
+    v = abs(v)
+    c = 1
+    g = gcd(v, N)
+    while g > 1:
+        # Peel off all occurrences of primes in g
+        c *= g
+        v //= g
+        g = gcd(v, g)
+    return c
 
 
 @dataclass
@@ -70,7 +115,7 @@ class WeilqFiber(CurveFiber):
         if e2 < a:
             return 0
         if e1 < a:
-            return l**e1
+            return l**e1 if not scalar_only else 0
         else:
             return phi(-1)(l**a)
 
@@ -81,23 +126,23 @@ class WeilqFiber(CurveFiber):
         if num_eigen == 0:
             return 0
         pi_local = self.frob_tower.order(f).embed_suborder(self.frob)
-        
         if self.gamma.type == 2 and vl(pi_local.v, l) < a: # we gate on scalar action, this is not dependeing on the shift, only wheter the w coord is 0 mod N
             return 0
-        
         # some early exits
         # if self.gamma.type != 1 and vl(pi_local.v, l) >= a:
         #    print(f"pi_local.v valuation at prime {l} is {vl(pi_local.v, l)}")
         #    total_val = phi(-1)(l**a)  # we reach maximum valuation
         # elif self.gamma.type == 2:
         #    total_val = 0  # we only want max
-        
         if True:  # we have partial inclusion, we have to check each eigenvalue
             val = 0
             for lam in eigen_data.values:
                 pi_local_shifted = pi_local.shift(-lam)
-                val += self.stable_lines_count(l, a, pi_local_shifted)
-                print(f"EIGENLINE l={l}, a={a}, lam={lam}, pi_local_shifted={pi_local_shifted}, val={val}")
+                _ell_val = self.stable_lines_count(l, a, pi_local_shifted)
+                val += _ell_val
+                print(
+                    f"l={l} i={vl(f, l)} inv={pi_local_shifted.u, pi_local_shifted.v} norm={pi_local_shifted.norm} stable_lines={_ell_val}"
+                )
         return val
 
     def local_level_record(
@@ -140,6 +185,17 @@ class WeilqFiber(CurveFiber):
     def local_mass(self, f: int) -> int:
         return self.frob_tower.class_size(f)
 
+    def tower_sum_lam(self, l: int, a: int, lam:int) -> int:
+        """Aggregate the local counts across the conductor tower at `l^a`."""
+        return sum(
+            self.local_mass(l**i)
+            * self.stable_lines_count(
+                l, a, self.frob_tower.order(l**i).embed_suborder(self.frob).shift(-lam),
+                self.gamma.type == 2
+            )
+            for i in range(0, self.frob_tower.conductors.get(l, 0) + 1)
+        )
+
     def tower_sum(self, l: int, a: int) -> int:
         """Aggregate the local counts across the conductor tower at `l^a`."""
         k = self.frob_tower.conductors.get(l, 0)
@@ -153,13 +209,44 @@ class WeilqFiber(CurveFiber):
         return l**3*(1-Fraction(1, l**2))
 
     def count(self) -> Fraction:
-        """Compute the weighted point-count contribution of this smooth fiber."""
-        lattice_sum = (
-            prod(self.tower_sum(l, a) for l, a in factorize(self.N))
-            * Phi(
-                self.chi_K,
-                self.frob_tower.max_coprime_conductor(self.N),
+        _count = 0
+
+        lambdas = range(self.N) if self.gamma.type == 0 else [1]
+        coprime = Phi(
+            self.chi_K,
+            self.frob_tower.max_coprime_conductor(self.N),
+        )
+
+        # lam first pov
+        for lam in lambdas:
+            alpha = self.frob.shift(-lam)
+            if alpha.norm % self.N != 0:
+                continue
+
+            """for d in divisors(alpha.v):
+                n1 = gcd(alpha.u, alpha.v // d, self.N)
+                m = self.N // n1
+                if m == 1:
+                    # Full rank 2 everywhere
+                    _count += phi(-1)(self.N) * self.local_mass(d)
+                else:
+                    # Primes where g reached the full depth of N
+                    g_sat = saturated_core(n1, m)
+                    # Base multiplicity g, boosted by (1 + 1/p) at saturated primes
+                    _count += (n1 // g_sat) * phi(-1)(g_sat) * self.local_mass(d)"""
+
+            _count += (
+                prod(self.tower_sum_lam(l, a, lam) for l, a in factorize(self.N))
+                * coprime
             )
+
+
+        """Compute the weighted point-count contribution of this smooth fiber."""
+        # lattice first pov
+        lattice_sum = prod(self.tower_sum(l, a) for l, a in factorize(self.N)) * coprime
+
+        print(
+            f"-----------Final lattice sum: {lattice_sum}, count: {_count}"
         )
         return lattice_sum * self.m0 * self.gamma.weight()
 

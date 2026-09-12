@@ -69,14 +69,26 @@ class CuspFqFiber(CurveFiber):
         self.dgon = dgon
         self.eigen_vals = eigen_vals
 
-    def stable_lines_count(self, l: int, a:int, e1: int, e2: int, scalar_only=False) -> int:
+    def stable_lines_count_ell(self, l: int, a:int, e1: int, e2: int, scalar_only=False) -> int:
         """Count stable lines in the local quotient defined by `alpha`."""
         if e1 + e2 < a:
             return 0
         if e1 * e2 == 0:
             return l**e2
         else:
-            return phi(1)(l**e2) 
+            return phi(1)(l**e2)
+
+    def stable_lines_count(
+        self, d1: int, d2: int, scalar_only=False
+    ) -> int:
+        """Count stable lines in the local quotient defined by `alpha`."""
+        if d1*d2 < self.gamma.N:
+            return 0
+        if d1 == 1 or d2 == 1:
+            return d2
+        else:
+            g = gcd(d1, d2)
+            return Fraction(d2, g) * phi(1)(g)
 
     def count(self) -> Fraction:
         N = self.gamma.N
@@ -85,52 +97,53 @@ class CuspFqFiber(CurveFiber):
         q = self.dgon.q
         e = self.gamma.N // self.dgon.d
         g = gcd(e, self.dgon.d)
-
-        
-        print(f"d={d}, t={t}, e={e}, g={g}, #eigen={len(self.eigen_vals)}")
-        
-        num_eigen_lines = len(self.eigen_vals) * Fraction(self.dgon.d, g)*phi(1)(g)
-        val = num_eigen_lines if self.gamma.type < 2 else (phi(-1)(self.gamma.N) if num_eigen_lines > 0 else 0)
-        
-        _val = 0
-        _val_new = 1
+        #m = g if self.gamma.type == 0 else 1
+        # num_e = m * Fraction(self.dgon.d, g) * phi(1)(g)
+        val = len(self.eigen_vals) * Fraction(self.dgon.d, g) * phi(1)(g)
+        # TODO: for gamma type == 0, we do not have to search the eigenvals, CRT gives #eigenvals g always.
+        # an optimized version, computationally faster but hides the structure
+        # num_eigen_lines = len(self.eigen_vals) * Fraction(self.dgon.d, g)*phi(1)(g)
+        # val = num_eigen_lines if self.gamma.type < 2 else (phi(-1)(self.gamma.N) if num_eigen_lines > 0 else 0)
+        # prime power version
+        """
         for l,a in factorize(N):
             _ev_val = 0
             lambdas = range(l**a) if self.gamma.type == 0 else [1]
             for ev in lambdas:
                 e1 = min(vl(e, l), vl(t * q - ev, l))
                 e2 = min(vl(d, l), vl(t - ev, l))
-                n1 = min(e1, e2)
-                n2 = max(e1, e2)
                 stable_lines = self.stable_lines_count(l, a, e1=e1, e2=e2)
                 _ev_val += stable_lines
                 print(
-                    f"d={self.dgon.d}, e={e}, lam={ev}, inv={e1,e2}, snf_inv={n1,n2}, stable_lines={stable_lines}, _ev_val={_ev_val}"
+                    f"d={self.dgon.d}, e={e}, lam={ev}, inv={e1,e2}, stable_lines={stable_lines}, _ev_val={_ev_val}"
                 )
-            _val_new *= _ev_val
-
-        """lambdas = range(N) if self.gamma.type == 0 else [1]
+            _val *= _ev_val"""
+        _val = 0
+        lambdas = range(self.gamma.N) if self.gamma.type == 0 else [1]
         for ev in lambdas:
-            # we reduce (tq-lam)x = -ejk mod N ==> since e = N/d, we solve mod e and then lift to mod N
             d1 = gcd(e, t * q - ev)
             d2 = gcd(d, t - ev)
-            #if d2 != d or d1 != e:
-            #    continue # ample gate
-            _lines = Fraction(self.dgon.d, g) * phi(1)(g)
-            # Num lifted solutions (tq-lam)x = -ejk mod N with x in (Z/(e)Z)^x
-            num_solutions = d * phi(1)(e)
-            num_lines = Fraction(num_solutions*phi(1)(d), phi(1)(N))
-            _val += num_lines
-            print(
-                f"d={self.dgon.d}, e={e}, lam={ev}, d2={d2}, num_solutions={num_solutions}, num_lines={num_lines}, _lines={_lines}"
-            )"""
-            
+            stable_lines = self.stable_lines_count(d1,d2)
+            _ell_val = 1
+            for l,a in factorize(self.gamma.N):
+                _ell_val *= self.stable_lines_count_ell(l, a, vl(d1, l), vl(d2, l))
+            true_val = Fraction(self.dgon.d, g) * phi(1)(g) if d1 == e and d2 == d else 0
+            clr = Colors.DIM if stable_lines == 0 else Colors.BOLD
+            _val += stable_lines
+            if stable_lines != 0:
+                Logger.cprint(
+                    f"d={self.dgon.d}, e={e}, g={g}, lam={ev}, inv={d1,d2}, #lines={stable_lines}, d/g*phi(1)({g})={true_val}, _ell_val={_ell_val}, num_eigens={len(self.eigen_vals)}",
+                    clr,
+                )
+        val_aut = Fraction(_val, self.dgon.d * 2) * self.gamma.weight(smooth=False)
+        clr = Colors.RED if _val != val else Colors.GREEN if _val > 0 else Colors.DIM
+        compare_str = f"CORRECT VALUE: {val}, COMPUTED VALUE: {_val}" if _val != val else ""
+        Logger.cprint(
+            f"Final count for cusp at d={self.dgon.d}. (unweighted): {_val},  (weighted) = {val_aut} {compare_str}",
+            clr,
+        )
 
-        _val *= Fraction(1, self.dgon.d * 2) * self.gamma.weight(smooth=False)
-        _val_new *= Fraction(1, self.dgon.d * 2) * self.gamma.weight(smooth=False)
-        clr = Colors.RED if _val_new != val_aut else Colors.GREEN
-        Logger.cprint(f"Final: correc_val={val_aut}, _val_new={_val_new}", clr)
-        return Fraction(val, self.dgon.d * 2) * self.gamma.weight(smooth=False)
+        return val_aut
 
     def snapshot(self) -> FiberRecord:
         total = self.count()
@@ -150,21 +163,48 @@ def enum_d_gons(
 ) -> list[CuspDatum]:
     """Enumerate cusp strata compatible with the chosen level type."""
     strata: list[CuspDatum] = []
-
     def get_eigenvalues_over_d(d:int, t:int, n: int) -> list[int]:
         e = n // d
         result = []
         lambdas = range(n) if level_type == 0 else [1]
         for lam in lambdas:
+            """if t == 1:
+                # note: for t = -1, lam = 1 gives 1-(-1)=2, we need d | 2 hence d in (1,2)
+                print(
+                    f"split cusp d={d} checking={lam}, (e | q-1)={(curve.q - 1) % e == 0}, (lam - t)={(lam - t)}"
+                )
+            else:
+                print(
+                    f"non split cusp d={d} checking={lam}, (e | q-1)={(curve.q - 1) % e == 0}, (lam - t)={(lam - t)}"
+                )"""
             if (lam - t * curve.q) % e == 0 and (lam - t) % d == 0:
                 result.append(lam)
+                """print(f"accepted lambda={lam} at d={d}, t={t}")"""
         return result
-
     divs = divisors(curve.N) if level_type != 2 else [curve.N]
+    lambdas = range(curve.N) if level_type == 0 else [1]
+    _count = 0
+    for t in (1, -1):
+        for lam in lambdas:
+            d1 = gcd(lam - t * curve.q, curve.N)
+            d2 = gcd(lam - t, curve.N)
+            if d1*d2 % curve.N != 0:
+                continue
+            m = curve.N // d1
+            for k in divisors(d2 // m):
+                d = m * k
+                e = curve.N // d
+                g = gcd(e, d)
+                _count += Fraction(1, g) * phi(1)(g)
+                print(
+                    f"d={d}, e={e}, lambda={lam}, t={t}, d1={d1}, d2={d2}, d={d}, _count={_count}, Fraction(1, g) * phi(1)(g)={Fraction(1, g) * phi(1)(g)}"
+                )
+    _count *= Fraction(1, 2) * curve.level_structure.weight(smooth=False)
+    print(f"_count={_count}")
     for d in divs:
         for s in (-1, 1):
             eigen_vals = get_eigenvalues_over_d(d, s, curve.N)
-            #if len(eigen_vals) == 0:
+            # if len(eigen_vals) == 0:
             #    continue
             strata.append((s, NeronDgonFq(d, curve.q, s), eigen_vals))
     return strata

@@ -17,6 +17,7 @@ from ...arithmetic.function import Phi, phi
 from ...arithmetic.quadratic import BicyclicGroup, LatticeTower, QuadraticOrderElement
 from ...config import get_config, get_pari
 from ...utils.logging import Colors, Logger
+from ...utils.fmt import fmt_factored
 from ..data import EigenForm, EigenFormRecord, FiberRecord, LevelStructureRecord
 from ..modular_curve import CurveFiber
 
@@ -216,38 +217,33 @@ class WeilqFiber(CurveFiber):
             self.chi_K,
             self.frob_tower.max_coprime_conductor(self.N),
         )
-
+        c_N = prod(p ** vl(self.frob.v, p) for p, _ in factorize(self.N)) # N supported, DOES NOT CHANGE over lambdas
+        __count = 0
         # lam first pov
         for lam in lambdas:
             alpha = self.frob.shift(-lam)
             if alpha.norm % self.N != 0:
                 continue
-
-            """for d in divisors(alpha.v):
-                n1 = gcd(alpha.u, alpha.v // d, self.N)
-                m = self.N // n1
-                if m == 1:
-                    # Full rank 2 everywhere
-                    _count += phi(-1)(self.N) * self.local_mass(d)
-                else:
-                    # Primes where g reached the full depth of N
-                    g_sat = saturated_core(n1, m)
-                    # Base multiplicity g, boosted by (1 + 1/p) at saturated primes
-                    _count += (n1 // g_sat) * phi(-1)(g_sat) * self.local_mass(d)"""
-
+            for d in divisors(c_N):
+                n1 = gcd(alpha.u, c_N // d, self.N)
+                n2 = gcd(alpha.norm // n1, self.N)
+                if n2 < self.N or (n1 < self.N and self.gamma.type == 2):
+                    continue
+                __count += (
+                    Fraction(phi(-1)(self.N), phi(-1)(self.N // n1))
+                    * self.local_mass(d)
+                    * coprime
+                )
             _count += (
                 prod(self.tower_sum_lam(l, a, lam) for l, a in factorize(self.N))
                 * coprime
             )
 
-
         """Compute the weighted point-count contribution of this smooth fiber."""
         # lattice first pov
         lattice_sum = prod(self.tower_sum(l, a) for l, a in factorize(self.N)) * coprime
-
-        print(
-            f"-----------Final lattice sum: {lattice_sum}, count: {_count}"
-        )
+        clr = Colors.GREEN if __count == _count else Colors.RED
+        Logger.cprint(f"-----------Final lattice sum: {lattice_sum}, count: {_count}, __count: {__count}", clr)
         return lattice_sum * self.m0 * self.gamma.weight()
 
     def get_eigen_structure(self) -> tuple[EigenFormRecord, ...]:

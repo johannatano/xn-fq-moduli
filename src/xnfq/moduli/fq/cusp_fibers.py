@@ -196,9 +196,9 @@ def enum_d_gons(
                 e = curve.N // d
                 g = gcd(e, d)
                 _count += Fraction(1, g) * phi(1)(g)
-                print(
-                    f"d={d}, e={e}, lambda={lam}, t={t}, d1={d1}, d2={d2}, d={d}, _count={_count}, Fraction(1, g) * phi(1)(g)={Fraction(1, g) * phi(1)(g)}"
-                )
+                #print(
+                #    f"d={d}, e={e}, lambda={lam}, t={t}, d1={d1}, d2={d2}, d={d}, _count={_count}, Fraction(1, g) * phi(1)(g)={Fraction(1, g) * phi(1)(g)}"
+                #)
     _count *= Fraction(1, 2) * curve.level_structure.weight(smooth=False)
     print(f"_count={_count}")
     for d in divs:

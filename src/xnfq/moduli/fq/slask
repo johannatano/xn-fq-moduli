@@ -1,0 +1,11 @@
+            """for d in divisors(alpha.v):
+                n1 = gcd(alpha.u, alpha.v // d, self.N)
+                m = self.N // n1
+                if m == 1:
+                    # Full rank 2 everywhere
+                    _count += phi(-1)(self.N) * self.local_mass(d)
+                else:
+                    # Primes where g reached the full depth of N
+                    g_sat = saturated_core(n1, m)
+                    # Base multiplicity g, boosted by (1 + 1/p) at saturated primes
+                    _count += (n1 // g_sat) * phi(-1)(g_sat) * self.local_mass(d)"""

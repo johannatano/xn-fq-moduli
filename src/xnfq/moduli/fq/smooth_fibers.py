@@ -141,9 +141,6 @@ class WeilqFiber(CurveFiber):
                 pi_local_shifted = pi_local.shift(-lam)
                 _ell_val = self.stable_lines_count(l, a, pi_local_shifted)
                 val += _ell_val
-                print(
-                    f"l={l} i={vl(f, l)} inv={pi_local_shifted.u, pi_local_shifted.v} norm={pi_local_shifted.norm} stable_lines={_ell_val}"
-                )
         return val
 
     def local_level_record(
@@ -217,33 +214,67 @@ class WeilqFiber(CurveFiber):
             self.chi_K,
             self.frob_tower.max_coprime_conductor(self.N),
         )
-        c_N = prod(p ** vl(self.frob.v, p) for p, _ in factorize(self.N)) # N supported, DOES NOT CHANGE over lambdas
+        if self.frob.v == 0:
+            c_N = 1
+        else:
+            c_N = prod(p ** vl(self.frob.v, p) for p, _ in factorize(self.N)) # N supported, DOES NOT CHANGE over lambdas
+
         __count = 0
+        q = self.frob.norm
+        a = self.frob.u
+
+        if c_N == 1:
+            return 0
         # lam first pov
         for lam in lambdas:
             alpha = self.frob.shift(-lam)
+            # _d = gcd(q - lam**2, alpha.norm // 2, self.N)
+            # _d = gcd(q - lam**2, alpha.trace, alpha.norm, self.N)
+            h = gcd(a - lam, self.frob.v, self.N)
+            """print(
+                f"lam={lam}, alpha.norm={alpha.norm}, _d={_d}, c_N={c_N}"
+            )"""
             if alpha.norm % self.N != 0:
                 continue
+
+            print(
+                f"lam={lam}, alpha.norm={alpha.norm}, h={h}, c_N={c_N}, ha={gcd(a - lam, self.N)}, a-lam={fmt_factored(a - lam)}"
+            )
             for d in divisors(c_N):
                 n1 = gcd(alpha.u, c_N // d, self.N)
                 n2 = gcd(alpha.norm // n1, self.N)
+
+                print(f"f={d}, inv={n1, n2}")
+
                 if n2 < self.N or (n1 < self.N and self.gamma.type == 2):
                     continue
+
                 __count += (
                     Fraction(phi(-1)(self.N), phi(-1)(self.N // n1))
                     * self.local_mass(d)
                     * coprime
                 )
-            _count += (
+            """_count += (
                 prod(self.tower_sum_lam(l, a, lam) for l, a in factorize(self.N))
                 * coprime
-            )
+            )"""
 
         """Compute the weighted point-count contribution of this smooth fiber."""
         # lattice first pov
+
+        pari = get_pari()
+
+        H_test = BinaryQuadraticForm.H((self.t**2-4*self.frob.norm) // self.N)
+
+        cN = self.frob.v // self.N
+        H_test_pari = pari.qfbhclassno(cN**2 * self.frob_tower.DK)
+        print(
+            f"H_test={H_test}, D={(self.t**2-4*self.frob.norm) // self.N}, pari={H_test_pari}"
+        )
+
         lattice_sum = prod(self.tower_sum(l, a) for l, a in factorize(self.N)) * coprime
-        clr = Colors.GREEN if __count == _count else Colors.RED
-        Logger.cprint(f"-----------Final lattice sum: {lattice_sum}, count: {_count}, __count: {__count}", clr)
+        clr = Colors.GREEN if __count == lattice_sum else Colors.RED
+        Logger.cprint(f"-----------Final lattice sum: {lattice_sum}, __count: {__count}, n", clr)
         return lattice_sum * self.m0 * self.gamma.weight()
 
     def get_eigen_structure(self) -> tuple[EigenFormRecord, ...]:
@@ -378,22 +409,24 @@ def enum_weil_q(curve: "ModularCurveFq") -> list[WeilDatum]:
             signs = t_signs(t)
         eigenforms = get_eigenforms(t, signs)
         base_form = BinaryQuadraticForm(1, t, q)
+
+        # todo: add back surviving check based on trace_data.survives()
         surviving = [
             trace_data for trace_data in eigenforms.values() if trace_data.survives()
         ]
         if not surviving:
             return []
-        #DK, f = base_form.to_D0_basis()
+        # DK, f = base_form.to_D0_basis()
         # NOTE: We only construct ONE tower and reuse, since L(pi)=L(-pi) in tower structure, and it is expensive to find D0.
         DK, f = BinaryQuadraticForm._D0(base_form.discriminant, pari=pari)
         tower = LatticeTower(DK, f, base_form, exclude=p)
         return [(trace_data.trace, tower, trace_data) for trace_data in surviving]
 
     # in the case of Gamma1, we might speed up t^2 <= 4q enumeration by solving explicit residues for pm(q+1) % N
-    if config.fast_trace and curve.level_structure.type == 1:
-        for t, signs in trace_classes(HB).items():
-            strata.extend(get_fibers_over_t(t, signs))
-    else:
-        for t in range(0, HB + 1):
-            strata.extend(get_fibers_over_t(t))
+    # if config.fast_trace and curve.level_structure.type == 1:
+    #    for t, signs in trace_classes(HB).items():
+    #        strata.extend(get_fibers_over_t(t, signs))
+    # else:
+    for t in range(0, HB + 1):
+        strata.extend(get_fibers_over_t(t))
     return strata

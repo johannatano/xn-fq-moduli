@@ -122,10 +122,9 @@ class NumberField(FieldExtension):
     def __init__(self, degree: int, basis: list):
         super().__init__(base_field=RationalField(), degree=degree, basis=basis)
 
-class NeronDgon(AbGrp):
+class NeronDgon():
     def __init__(self, d: int):
         self.d = d
-
     def torsion_subgroup(self, n: int) -> "NeronDgon":
         """Return the n-torsion subgroup of the NeronDgon."""
         if n % self.d != 0:

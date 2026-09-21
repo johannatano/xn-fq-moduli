@@ -23,45 +23,6 @@ from ..modular_curve import CurveFiber
 
 from ..level_structures import LevelStructure
 
-def radical(n: int) -> int:
-    """Product of distinct prime factors of n: rad(n) = prod_{p | n} p."""
-    if n <= 1:
-        return 1
-    rad = 1
-    d = 2
-    temp = n
-    while d * d <= temp:
-        if temp % d == 0:
-            rad *= d
-            while temp % d == 0:
-                temp //= d
-        d += 1
-    if temp > 1:
-        rad *= temp
-    return rad
-
-
-def saturated_core(g: int, m: int) -> int:
-    """Removes from g all prime factors that divide m."""
-    h = gcd(g, m)
-    while h > 1:
-        g //= h
-        h = gcd(g, h)
-    return g
-
-
-def n_part(v: int, N: int) -> int:
-    """Extracts the part of v divisible only by primes dividing N."""
-    v = abs(v)
-    c = 1
-    g = gcd(v, N)
-    while g > 1:
-        # Peel off all occurrences of primes in g
-        c *= g
-        v //= g
-        g = gcd(v, g)
-    return c
-
 
 @dataclass
 class EigenValues:
@@ -77,11 +38,31 @@ class EigenValues:
         return len(self.values) == 0
 
 @dataclass
-class EigenTrace:
+class StableLinesData:
     """One Frobenius trace together with its admissible local eigenvalues."""
     trace: int
     base_form: BinaryQuadraticForm
     eigenvalues: dict[int, EigenValues] = field(default_factory=dict)
+    global_eigenvalues: list[int] = field(default_factory=list)
+
+    def compute_global_eigenvalues(self, N: int) -> None:
+        """Combine the local eigenvalue sets into residues modulo ``N``."""
+        combined = [0]
+        modulus = 1
+        for local_data in self.eigenvalues.values():
+            next_combined = []
+            local_modulus = local_data.modulus
+            for current in combined:
+                for local_value in local_data.values:
+                    offset = (
+                        (local_value - current)
+                        * pow(modulus, -1, local_modulus)
+                    ) % local_modulus
+                    next_combined.append(current + modulus * offset)
+            combined = next_combined
+            modulus *= local_modulus
+        self.global_eigenvalues = sorted({value % N for value in combined})
+
     def survives(self) -> bool:
         return all(not data.is_empty() for data in self.eigenvalues.values())
 
@@ -94,18 +75,16 @@ class WeilqFiber(CurveFiber):
         gamma: LevelStructure,
         t: int,
         frob_tower: LatticeTower,
-        eigen_trace: EigenTrace,
+        frob_lines: StableLinesData,
         mass: Fraction,
     ):
         super().__init__(gamma)
         self.t = t
         self.frob_tower = frob_tower
-        # sign = -1 if t < 0 else 1
-        pi_form = eigen_trace.base_form
+        pi_form = frob_lines.base_form
         self.frob = QuadraticOrderElement.from_norm_form(frob_tower.OK, pi_form)
-
         self.m0 = mass  # * (1 if self.base.level_structure.type > 0 else 2)
-        self.eigen_trace = eigen_trace
+        self.frob_lines = frob_lines
         self.chi_K = frob_tower.chi_K
 
     def stable_lines_count(
@@ -120,29 +99,6 @@ class WeilqFiber(CurveFiber):
         else:
             return phi(-1)(l**a)
 
-    def local_structure_count(self, l: int, a: int, f: int = 0) -> int:
-        """Count local level structures above the conductor slice `f`."""
-        eigen_data = self.eigen_trace.eigenvalues[l]
-        num_eigen = len(eigen_data.values)
-        if num_eigen == 0:
-            return 0
-        pi_local = self.frob_tower.order(f).embed_suborder(self.frob)
-        if self.gamma.type == 2 and vl(pi_local.v, l) < a: # we gate on scalar action, this is not dependeing on the shift, only wheter the w coord is 0 mod N
-            return 0
-        # some early exits
-        # if self.gamma.type != 1 and vl(pi_local.v, l) >= a:
-        #    print(f"pi_local.v valuation at prime {l} is {vl(pi_local.v, l)}")
-        #    total_val = phi(-1)(l**a)  # we reach maximum valuation
-        # elif self.gamma.type == 2:
-        #    total_val = 0  # we only want max
-        if True:  # we have partial inclusion, we have to check each eigenvalue
-            val = 0
-            for lam in eigen_data.values:
-                pi_local_shifted = pi_local.shift(-lam)
-                _ell_val = self.stable_lines_count(l, a, pi_local_shifted)
-                val += _ell_val
-        return val
-
     def local_level_record(
         self,
         prime_powers: tuple[tuple[int, int], ...],
@@ -150,10 +106,8 @@ class WeilqFiber(CurveFiber):
         lam: int,
     ) -> LevelStructureRecord:
         """Build the conductor-`f` record for one global eigenvalue modulo `N`."""
-
         pi_local = self.frob_tower.order(f).embed_suborder(self.frob)
         pi_local_shifted = pi_local.shift(-lam)
-
         im = [1, 1]
         ker = [1, 1]
         num_lines = 1
@@ -173,7 +127,6 @@ class WeilqFiber(CurveFiber):
             order=self.frob_tower.order(f),
             mass=self.local_mass(f),
             coords=pi_local_shifted.coords,
-            #coords_pi_basis=pi_local_shifted.coords_in_basis(self.frob),
             im=tuple(im),
             ker=tuple(ker),
             num_lines=num_lines,
@@ -183,120 +136,43 @@ class WeilqFiber(CurveFiber):
     def local_mass(self, f: int) -> int:
         return self.frob_tower.class_size(f)
 
-    def tower_sum_lam(self, l: int, a: int, lam:int) -> int:
-        """Aggregate the local counts across the conductor tower at `l^a`."""
-        return sum(
-            self.local_mass(l**i)
-            * self.stable_lines_count(
-                l, a, self.frob_tower.order(l**i).embed_suborder(self.frob).shift(-lam),
-                self.gamma.type == 2
-            )
-            for i in range(0, self.frob_tower.conductors.get(l, 0) + 1)
-        )
-
-    def tower_sum(self, l: int, a: int) -> int:
-        """Aggregate the local counts across the conductor tower at `l^a`."""
-        k = self.frob_tower.conductors.get(l, 0)
-        return sum(
-            self.local_mass(l**i) * self.local_structure_count(l, a, l**i)
-            for i in range(0, k + 1)
-        )
-
-    def true_count_full(self, l:int) -> int:
-        """Compute the unweighted point-count contribution of this smooth fiber."""
-        return l**3*(1-Fraction(1, l**2))
-
     def count(self) -> Fraction:
-        _count = 0
+        count = 0
 
-        lambdas = range(self.N) if self.gamma.type == 0 else [1]
+        c_N_support, c_coprime = self.frob_tower.split(self.N)
+
         coprime = Phi(
             self.chi_K,
-            self.frob_tower.max_coprime_conductor(self.N),
+            prod(l**a for l, a in c_coprime.items()),
         )
         if self.frob.v == 0:
             c_N = 1
         else:
-            c_N = prod(p ** vl(self.frob.v, p) for p, _ in factorize(self.N)) # N supported, DOES NOT CHANGE over lambdas
+            q = self.frob.norm
+            #c_N = prod(p ** vl(self.frob.v, p) for p, _ in factorize(self.N) if q % p != 0) # N supported, DOES NOT CHANGE over lambdas
+            c_N = prod(l**a for l, a in c_N_support.items())
+            #print(f"c_N_2={c_N_2}, c_N={c_N}")
 
-        __count = 0
-        q = self.frob.norm
-        a = self.frob.u
-
-        if c_N == 1:
-            return 0
-        # lam first pov
-        for lam in lambdas:
+        for lam in self.frob_lines.global_eigenvalues:
             alpha = self.frob.shift(-lam)
-            # _d = gcd(q - lam**2, alpha.norm // 2, self.N)
-            # _d = gcd(q - lam**2, alpha.trace, alpha.norm, self.N)
-            h = gcd(a - lam, self.frob.v, self.N)
-            """print(
-                f"lam={lam}, alpha.norm={alpha.norm}, _d={_d}, c_N={c_N}"
-            )"""
-            if alpha.norm % self.N != 0:
-                continue
-
-            print(
-                f"lam={lam}, alpha.norm={alpha.norm}, h={h}, c_N={c_N}, ha={gcd(a - lam, self.N)}, a-lam={fmt_factored(a - lam)}"
-            )
             for d in divisors(c_N):
-                n1 = gcd(alpha.u, c_N // d, self.N)
+                n1 = gcd(alpha.u, self.frob.v // d, self.N) #TODO: check correct for (p,N) neq 1
                 n2 = gcd(alpha.norm // n1, self.N)
-
-                print(f"f={d}, inv={n1, n2}")
-
                 if n2 < self.N or (n1 < self.N and self.gamma.type == 2):
+                    # NOTE: we still need this, since the exp might drop below in the conductor tower even if N | norm(alpha)
                     continue
-
-                __count += (
+                count += (
                     Fraction(phi(-1)(self.N), phi(-1)(self.N // n1))
                     * self.local_mass(d)
                     * coprime
                 )
-            """_count += (
-                prod(self.tower_sum_lam(l, a, lam) for l, a in factorize(self.N))
-                * coprime
-            )"""
+        return count * self.m0 * self.gamma.weight()
 
-        """Compute the weighted point-count contribution of this smooth fiber."""
-        # lattice first pov
-
-        pari = get_pari()
-
-        H_test = BinaryQuadraticForm.H((self.t**2-4*self.frob.norm) // self.N)
-
-        cN = self.frob.v // self.N
-        H_test_pari = pari.qfbhclassno(cN**2 * self.frob_tower.DK)
-        print(
-            f"H_test={H_test}, D={(self.t**2-4*self.frob.norm) // self.N}, pari={H_test_pari}"
-        )
-
-        lattice_sum = prod(self.tower_sum(l, a) for l, a in factorize(self.N)) * coprime
-        clr = Colors.GREEN if __count == lattice_sum else Colors.RED
-        Logger.cprint(f"-----------Final lattice sum: {lattice_sum}, __count: {__count}, n", clr)
-        return lattice_sum * self.m0 * self.gamma.weight()
-
-    def get_eigen_structure(self) -> tuple[EigenFormRecord, ...]:
+    def get_structure(self) -> tuple[EigenFormRecord, ...]:
         eigen_records: list[EigenFormRecord] = []
-
         prime_powers = tuple(factorize(self.N))
-        conductors = tuple(self.frob_tower.supported_divisors(self.N))
         conductors = tuple(self.frob_tower.conductor_divisors())
-        # coprime = tuple(self.frob_tower.split(self.N)[1])
-
-        for lam in self.gamma.eigenvalues(self.N):
-            is_valid = True
-            # for l, a in prime_powers:
-            # modulus = l**a
-            # residue = lam % modulus
-            # eigendata = self.eigen_trace.eigenvalues[l]
-            # if residue not in eigendata.values:
-            #    is_valid = False
-            #    break
-            # if not is_valid:
-            #   continue
-
+        for lam in self.frob_lines.global_eigenvalues:
             alpha = self.frob.shift(-lam)
             level_records = [
                 self.local_level_record(prime_powers, f, lam) for f in conductors
@@ -308,11 +184,10 @@ class WeilqFiber(CurveFiber):
                     level_records=tuple(level_records),
                 )
             )
-
         return tuple(eigen_records)
 
     def snapshot(self) -> FiberRecord:
-        eigen_records = self.get_eigen_structure()
+        eigen_records = self.get_structure()
         return FiberRecord(
             kind="weil",
             t=self.t,
@@ -376,17 +251,17 @@ def enum_weil_q(curve: "ModularCurveFq") -> list[WeilDatum]:
         for lam in curve.level_structure.eigenvalues(modulus):
             # For a shifted monic form, divisibility by l^a is detected on the
             # constant term alone: C' = lam^2 - t*lam + q.
-            # shifted_c = base_form.A * lam * lam - base_form.B * lam + base_form.C
-            # if shifted_c % modulus != 0:
-            #    continue
+            shifted_c = base_form.A * lam * lam - base_form.B * lam + base_form.C
+            if shifted_c % modulus != 0:
+                continue
             shifts.append(lam)
         return shifts
 
     def get_eigenforms(
         t: int,
         signs: list[int],
-    ) -> dict[int, EigenTrace]:
-        eigenforms: dict[int, EigenTrace] = {}
+    ) -> dict[int, StableLinesData]:
+        eigenforms: dict[int, StableLinesData] = {}
         allowed_split_types = [0, 1] if curve.level_structure.scalar_only else [0, 1]
         D = t * t - 4 * q
         for s in signs:
@@ -394,7 +269,7 @@ def enum_weil_q(curve: "ModularCurveFq") -> list[WeilDatum]:
             if not is_valid(D, trace):
                 continue
             base_form = BinaryQuadraticForm(1, trace, q)
-            eigenforms[trace] = EigenTrace(trace, base_form)
+            eigenforms[trace] = StableLinesData(trace, base_form)
         for l, a in factorize(curve.N):
             split_type = kronecker(D, l)
             for trace_data in eigenforms.values():
@@ -402,6 +277,8 @@ def enum_weil_q(curve: "ModularCurveFq") -> list[WeilDatum]:
                 if split_type in allowed_split_types:
                     values = get_eigenvals(trace_data.base_form, l, a)
                 trace_data.eigenvalues[l] = EigenValues(l, a, split_type, values)
+        for trace_data in eigenforms.values():
+            trace_data.compute_global_eigenvalues(curve.N)
         return eigenforms
 
     def get_fibers_over_t(t: int, signs: list[int] = None) -> list[WeilDatum]:
@@ -409,8 +286,6 @@ def enum_weil_q(curve: "ModularCurveFq") -> list[WeilDatum]:
             signs = t_signs(t)
         eigenforms = get_eigenforms(t, signs)
         base_form = BinaryQuadraticForm(1, t, q)
-
-        # todo: add back surviving check based on trace_data.survives()
         surviving = [
             trace_data for trace_data in eigenforms.values() if trace_data.survives()
         ]
@@ -420,13 +295,15 @@ def enum_weil_q(curve: "ModularCurveFq") -> list[WeilDatum]:
         # NOTE: We only construct ONE tower and reuse, since L(pi)=L(-pi) in tower structure, and it is expensive to find D0.
         DK, f = BinaryQuadraticForm._D0(base_form.discriminant, pari=pari)
         tower = LatticeTower(DK, f, base_form, exclude=p)
+        
+        
         return [(trace_data.trace, tower, trace_data) for trace_data in surviving]
 
     # in the case of Gamma1, we might speed up t^2 <= 4q enumeration by solving explicit residues for pm(q+1) % N
-    # if config.fast_trace and curve.level_structure.type == 1:
-    #    for t, signs in trace_classes(HB).items():
-    #        strata.extend(get_fibers_over_t(t, signs))
-    # else:
-    for t in range(0, HB + 1):
-        strata.extend(get_fibers_over_t(t))
+    if config.fast_trace and curve.level_structure.type == 1:
+        for t, signs in trace_classes(HB).items():
+            strata.extend(get_fibers_over_t(t, signs))
+    else:
+        for t in range(0, HB + 1):
+            strata.extend(get_fibers_over_t(t))
     return strata

@@ -11,7 +11,6 @@ from utils.args import parse_example_args
 from utils.fmt import fmt_magnitude
 from utils.logging import Logger, Colors
 
-
 def XN_over(_type:int, N:int, p:int, n:int):
     if _type == 0:
         return X0(N).over(p, n)
@@ -21,6 +20,7 @@ def XN_over(_type:int, N:int, p:int, n:int):
         return X(N).over(p, n)
     else:
         raise ValueError(f"Unsupported type: {_type}")
+    
 def run():
     # ===== init ====================================================
     args = parse_args()
@@ -48,7 +48,6 @@ def run():
         f"X_{args.type}({N}) fiber count over F_{p}^{n} : #Y_{args.type}({N}) = {YN}, #Cusps_{args.type}({N}) = {CN} | (t={(run_t):.2f}s)"
     )
     # ================================================================
-
 
 # ===== args parsing ============================================
 def parse_args():

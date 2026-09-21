@@ -36,7 +36,6 @@ def format_weil_fiber_data(data: FiberRecord, N: int) -> list[list[ResultData]]:
         )
     return rows"""
 
-
 def format_eigenform_fiber_data(s_rec: FiberRecord, data: EigenFormRecord, q:int, N: int, i: int = 0) -> list[list[ResultData]]:
     rows: list[list[ResultData]] = []
     eigenform = data.eigenform
@@ -47,11 +46,8 @@ def format_eigenform_fiber_data(s_rec: FiberRecord, data: EigenFormRecord, q:int
         parity = s_rec.t % 2
         a_pi = (s_rec.t - parity) // 2
         zero_form = data.base_form.shift(-a_pi)
-
         h = abs(eigenform.form.B) // 2
-
         a_pi_local = (eigenform.form.B - parity) // 2
-
         prev = s_rec.eigen_records[i - 1] if i > 0 else None
         diff = 0
         if prev:

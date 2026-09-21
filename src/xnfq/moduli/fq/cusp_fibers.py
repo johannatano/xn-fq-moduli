@@ -14,45 +14,13 @@ from ...utils.logging import Colors, Logger
 if TYPE_CHECKING:
     from .curve import ModularCurveFq
 
-
 class NeronDgonFq(NeronDgon):
     def __init__(self, d: int, q: int, t:int):
         super().__init__(d)
         self.q = q
         self.t = t
 
-    def stable_subgroup(self, n: int):
-        if n % self.d != 0:
-            return (0, 0)
-        e = n // self.d
-        g = gcd(self.d, e)
-        if (self.q - 1) % g != 0:
-            return (0, 0)
-        # Frob stable subgroup, diamond
-        return (1,g)
-
-    def fixed_subgroup(self, n: int) -> "NeronDgon":
-        """Return the n-torsion subgroup of the NeronDgon."""
-        if n % self.d != 0:
-            return (0,0)
-        e = n // self.d
-        # If split type 1 we use defualt, splitt ype -1 fixed by Frob twisted
-        if self.t == 1:
-            return (gcd(e, self.q-1), self.d)
-        else:
-            return (gcd(e, self.q+1), gcd(self.d, 2))
-
-    def invariants(self):
-        if self.t == 1:
-            a, b = self.q - 1, self.d
-        else:
-            a, b = self.q + 1, gcd(self.d, 2)
-        n1, n2 = gcd(a, b), lcm(a, b)  # invariant factors, n1 | n2, n1*n2 = a*b
-        return n1, n2
-
-
 CuspDatum = tuple[int, NeronDgonFq, list[int]]
-
 
 class CuspFqFiber(CurveFiber):
     """The cusp contribution for a chosen level-N moduli problem."""
@@ -91,39 +59,22 @@ class CuspFqFiber(CurveFiber):
             return Fraction(d2, g) * phi(1)(g)
 
     def count(self) -> Fraction:
-        N = self.gamma.N
-        d = self.dgon.d
-        t = self.t
-        q = self.dgon.q
-        e = self.gamma.N // self.dgon.d
-        g = gcd(e, self.dgon.d)
-        #m = g if self.gamma.type == 0 else 1
-        # num_e = m * Fraction(self.dgon.d, g) * phi(1)(g)
-        val = len(self.eigen_vals) * Fraction(self.dgon.d, g) * phi(1)(g)
+        g = gcd(self.gamma.N // self.dgon.d, self.dgon.d)
+        val = len(self.eigen_vals) * Fraction(1, g) * phi(1)(g) # simplified, removed d/d
         # TODO: for gamma type == 0, we do not have to search the eigenvals, CRT gives #eigenvals g always.
-        # an optimized version, computationally faster but hides the structure
-        # num_eigen_lines = len(self.eigen_vals) * Fraction(self.dgon.d, g)*phi(1)(g)
         # val = num_eigen_lines if self.gamma.type < 2 else (phi(-1)(self.gamma.N) if num_eigen_lines > 0 else 0)
-        # prime power version
-        """
-        for l,a in factorize(N):
-            _ev_val = 0
-            lambdas = range(l**a) if self.gamma.type == 0 else [1]
-            for ev in lambdas:
-                e1 = min(vl(e, l), vl(t * q - ev, l))
-                e2 = min(vl(d, l), vl(t - ev, l))
-                stable_lines = self.stable_lines_count(l, a, e1=e1, e2=e2)
-                _ev_val += stable_lines
-                print(
-                    f"d={self.dgon.d}, e={e}, lam={ev}, inv={e1,e2}, stable_lines={stable_lines}, _ev_val={_ev_val}"
-                )
-            _val *= _ev_val"""
-        _val = 0
-        lambdas = range(self.gamma.N) if self.gamma.type == 0 else [1]
-        for ev in lambdas:
+        val_aut = Fraction(val, 2) * self.gamma.weight(smooth=False)
+        return val_aut
+
+    def snapshot(self) -> FiberRecord:
+        total = self.count()
+        """for ev in self.eigen_vals:
             d1 = gcd(e, t * q - ev)
             d2 = gcd(d, t - ev)
             stable_lines = self.stable_lines_count(d1,d2)
+            print(
+                f"d={self.dgon.d}, e={e}, lam={ev}, inv={d1,d2}, stable_lines={stable_lines}, self.eigen_vals={self.eigen_vals}"
+            )
             _ell_val = 1
             for l,a in factorize(self.gamma.N):
                 _ell_val *= self.stable_lines_count_ell(l, a, vl(d1, l), vl(d2, l))
@@ -134,19 +85,7 @@ class CuspFqFiber(CurveFiber):
                 Logger.cprint(
                     f"d={self.dgon.d}, e={e}, g={g}, lam={ev}, inv={d1,d2}, #lines={stable_lines}, d/g*phi(1)({g})={true_val}, _ell_val={_ell_val}, num_eigens={len(self.eigen_vals)}",
                     clr,
-                )
-        val_aut = Fraction(_val, self.dgon.d * 2) * self.gamma.weight(smooth=False)
-        clr = Colors.RED if _val != val else Colors.GREEN if _val > 0 else Colors.DIM
-        compare_str = f"CORRECT VALUE: {val}, COMPUTED VALUE: {_val}" if _val != val else ""
-        Logger.cprint(
-            f"Final count for cusp at d={self.dgon.d}. (unweighted): {_val},  (weighted) = {val_aut} {compare_str}",
-            clr,
-        )
-
-        return val_aut
-
-    def snapshot(self) -> FiberRecord:
-        total = self.count()
+                )"""
         return FiberRecord(
             kind="cusp",
             t=self.t,
@@ -156,33 +95,14 @@ class CuspFqFiber(CurveFiber):
             total_mass=total,
         )
 
-
 def enum_d_gons(
     curve: "ModularCurveFq",
     level_type: int,
 ) -> list[CuspDatum]:
     """Enumerate cusp strata compatible with the chosen level type."""
     strata: list[CuspDatum] = []
-    def get_eigenvalues_over_d(d:int, t:int, n: int) -> list[int]:
-        e = n // d
-        result = []
-        lambdas = range(n) if level_type == 0 else [1]
-        for lam in lambdas:
-            """if t == 1:
-                # note: for t = -1, lam = 1 gives 1-(-1)=2, we need d | 2 hence d in (1,2)
-                print(
-                    f"split cusp d={d} checking={lam}, (e | q-1)={(curve.q - 1) % e == 0}, (lam - t)={(lam - t)}"
-                )
-            else:
-                print(
-                    f"non split cusp d={d} checking={lam}, (e | q-1)={(curve.q - 1) % e == 0}, (lam - t)={(lam - t)}"
-                )"""
-            if (lam - t * curve.q) % e == 0 and (lam - t) % d == 0:
-                result.append(lam)
-                """print(f"accepted lambda={lam} at d={d}, t={t}")"""
-        return result
-    divs = divisors(curve.N) if level_type != 2 else [curve.N]
     lambdas = range(curve.N) if level_type == 0 else [1]
+    eigenvalues_by_stratum: dict[tuple[int, int], set[int]] = {}
     _count = 0
     for t in (1, -1):
         for lam in lambdas:
@@ -193,18 +113,7 @@ def enum_d_gons(
             m = curve.N // d1
             for k in divisors(d2 // m):
                 d = m * k
-                e = curve.N // d
-                g = gcd(e, d)
-                _count += Fraction(1, g) * phi(1)(g)
-                #print(
-                #    f"d={d}, e={e}, lambda={lam}, t={t}, d1={d1}, d2={d2}, d={d}, _count={_count}, Fraction(1, g) * phi(1)(g)={Fraction(1, g) * phi(1)(g)}"
-                #)
-    _count *= Fraction(1, 2) * curve.level_structure.weight(smooth=False)
-    print(f"_count={_count}")
-    for d in divs:
-        for s in (-1, 1):
-            eigen_vals = get_eigenvalues_over_d(d, s, curve.N)
-            # if len(eigen_vals) == 0:
-            #    continue
-            strata.append((s, NeronDgonFq(d, curve.q, s), eigen_vals))
+                eigenvalues_by_stratum.setdefault((t, d), set()).add(lam)
+    for (t, d), eigen_vals in sorted(eigenvalues_by_stratum.items()):
+        strata.append((t, NeronDgonFq(d, curve.q, t), sorted(eigen_vals)))
     return strata

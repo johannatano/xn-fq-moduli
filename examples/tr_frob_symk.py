@@ -15,19 +15,6 @@ from utils.lmfdb_api import fetch_traces
 from utils.logging import Logger, Colors
 from sympy import primerange
 
-"""
-def hk(t: int, q: int, k: int) -> int:
-    return sum(comb(k - j, j) * (-q) ** j * t ** (k - 2 * j) for j in range(k // 2 + 1))
-
-def tr_frob_symk(x1n, k: int) -> int:
-    val = 0
-    #TODO: not sure if this always holds?
-    if k == 0:
-        val = x1n.q + (1 if gcd(x1n.q, x1n.N) == 1 else 0)
-    curves_term = sum(hk(c.t, x1n.q, k) * c.count() for c in x1n.yfq())
-    cusp_term = sum((c.t ** (k + 2)) * c.count() for c in x1n.cusps())
-    return val - curves_term - cusp_term"""
-
 
 def run():
     args = parse_args()
@@ -37,13 +24,14 @@ def run():
     N = args.N
     q = p ** n
 
-    primes = list(primerange(2, 500))
-    for _p in primes:
-        if (_p-1) % N == 0:
-            Logger.cprint(f"Prime {_p} satisfies (p-1) % N={(_p-1) % N}, (q-1) % N={(q-1) % N}", Colors.GREEN)
+    #primes = list(primerange(2, 500))
+    #for _p in primes:
+    #    if (_p-1) % N == 0:
+    #        Logger.cprint(f"Prime {_p} satisfies (p-1) % N={(_p-1) % N}, (q-1) % N={(q-1) % N}", Colors.GREEN)
 
     fast_trace = args.fast_trace
     using_pari = args.use_pari if hasattr(args, "use_pari") else False
+    
     Logger.cprint(
         f"Computing S_{args.k+2}(Frob_{q} | Sym^{args.k}) | Optimized trace enum: {fast_trace} | Using PARI: {using_pari} | q mag={fmt_magnitude(q)}",
         Colors.HEADER,
@@ -52,53 +40,19 @@ def run():
     start_t = time.time()
     q = p**n
     k = args.k
-    # X1Fq = ModularCurve(Gamma1(N)).over(p, n)
     mod_curve = None
     if args.type == 1:
-        mod_curve = X1(N).over(p, n)#ModularCurve(Gamma1(N)).over(p, n)
+        mod_curve = X1(N).over(p, n)
     elif args.type == 0:
         mod_curve = X0(N).over(p, n)
     else:
         mod_curve = X(N).over(p, n)
-        print(f"mod_curve={mod_curve}, curve_q={mod_curve.q}, p={p}, n={n}")
 
     trace = mod_curve.tr_frob_symk(args.k)
-
-    # structure = mod_curve.get_structure()
-
-    """debug_sum = 0
-    for s_rec in structure.fibers:
-        if s_rec.kind != "weil":
-            Logger.cprint(
-                f"CUSP fiber info: t={s_rec.trace}, d={s_rec.d}, total_count={s_rec.total_count}",
-                Colors.RED,
-            )
-            continue
-        clr = Colors.CYAN
-        if s_rec.total_count == 0:
-            continue
-        t = s_rec.trace
-        hk = mod_curve.hk(t, q, k)
-        '''Logger.cprint(
-            f"Weil fiber info:{s_rec.discriminant}, t={s_rec.trace}, total_mass={s_rec.total_mass}, total_count={s_rec.total_count}, hk={hk}",
-            clr,
-        )'''
-        debug_sum += hk*s_rec.total_count
-        for level_rec in s_rec.level_records:
-            clr = (
-                Colors.GREEN
-                if level_rec.full
-                else Colors.RED if level_rec.cyclic == 0 else Colors.YELLOW
-            )
-            #Logger.cprint(f"Level record:{level_rec}", clr)
-    #Logger.cprint(f"Debug sum: {debug_sum}", Colors.MAGENTA)
-    # trace0 = mod_curve.tr_frob_symk(args.k)"""
-
     stop_t = time.time()
 
     ref = None
     if args.sage:
-
         from sage.all import (
             CuspForms,
             Gamma1 as SageGamma1,
@@ -133,12 +87,10 @@ def run():
             f"Result: trace={trace}, time={(stop_t - start_t):.9f}", clr
         )
 
-
 def parse_args():
     return parse_example_args(
         "Compute Tr Sym^k on X1(N)", include_sym_power=True, include_sage=True
     )
-
 
 if __name__ == "__main__":
     run()

@@ -13,7 +13,7 @@ from ..modular_curve import ModularCurve
 if TYPE_CHECKING:
     from ...arithmetic.algebra import NeronDgon
     from ...arithmetic.quadratic import LatticeTower
-    from .smooth_fibers import EigenTrace
+    from .smooth_fibers import StableLinesData
 
 
 def _hK(DK: int) -> int:
@@ -33,7 +33,7 @@ def _uK(DK: int) -> Fraction:
 def _d0(DK: int, p: int, t: int) -> int:
     return 1 - legendre(DK, p) if t % p == 0 else 1
 
-WeilDatum = tuple[int, "LatticeTower", "EigenTrace"]
+WeilDatum = tuple[int, "LatticeTower", "StableLinesData"]
 CuspDatum = tuple[int, "NeronDgon"]
 
 class ModularCurveFq(ModularCurve):
@@ -51,13 +51,13 @@ class ModularCurveFq(ModularCurve):
         """Yield the non-cuspidal Frobenius strata over `F_q`."""
         from .smooth_fibers import WeilqFiber, enum_weil_q
 
-        for t, tower, eigen_trace in enum_weil_q(self):
+        for t, tower, frob_lines in enum_weil_q(self):
             mass = Fraction(
                 _mK(tower.DK, self.p) * _d0(tower.DK, self.p, t), _uK(tower.DK)
             )
             if mass == 0:
                 continue
-            yield WeilqFiber(self.level_structure, t, tower, eigen_trace, mass)
+            yield WeilqFiber(self.level_structure, t, tower, frob_lines, mass)
 
     def cusps(self):
         """Yield cusp fibers allowed by the level structure over `F_q`."""
@@ -80,8 +80,4 @@ class ModularCurveFq(ModularCurve):
             val = self.q + (1 if gcd(self.q, self.N) == 1 else 0)
         curves_term = sum(self.hk(c.t, self.q, k) * c.count() for c in self.smooth_fibers())
         cusp_term = sum((c.t ** (k + 2)) * c.count() for c in self.cusps())
-
-        print(
-            f"val={val}, curves_term={curves_term}, cusp_term={cusp_term}"
-        )
         return val - curves_term - cusp_term

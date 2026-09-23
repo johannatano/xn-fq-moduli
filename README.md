@@ -54,9 +54,7 @@ fibers, with each stratum indexed by its Frobenius trace `t`. Over
 $\overline{\mathbb F}_q$, smooth fibers are modeled by
 $\mathbb Z/N\mathbb Z\times\mathbb Z/N\mathbb Z$, while cusp fibers are
 modeled by Neron $d$-gons 
-$\mathbb F_q^\times\times\mathbb Z/d\mathbb Z$. The $\mathbb F_q$-rational
-fibers are modelled as eigenforms $\pi-\lambda$ acting on the
-corresponding group model.
+$\mathbb F_q^\times\times\mathbb Z/d\mathbb Z$. The $\mathbb F_q$-rational fibers are Frobenius stable eigenforms (lines) acting on the corresponding model.
 
 ## Count points
 ```python
@@ -143,17 +141,21 @@ FiberRecordFq
 - **Fiber record:** the outer record for one Frobenius stratum. It stores the
     fiber type, the stratum parameter `t`, the total point contribution, and a
     collection of eigenform records.
-- **Eigenform record:** one admissible eigenvalue $\lambda$ inside a fiber,
-    together with its model. For a smooth fiber, the model is the associated
-    binary quadratic form; the integer-trace case has $D_K=0$. For a cusp fiber,
-    the model is the cusp form encoding the congruence conditions modulo $N$ on
-    the Neron $d$-gon. Each eigenform record contains its level records.
-- **Level record:** one local refinement of an eigenform. For a smooth fiber,
-    choose a conductor index $f$, embed the shifted form $(1,t,q)-\lambda$ as
-    the algebraic integer $\pi-\lambda$ in the corresponding sublattice, and
-    record its local invariants. For a cusp fiber, choose an admissible stable
-    Neron $d$-gon with group $\mu_{N/d}\times\mathbb Z/d\mathbb Z$ and record
-    its local invariants.
+- **Eigenform record:** For a smooth fiber, the model is the binary quadratic
+    form $(1,t,q)$ shifted by $-\lambda$, giving the algebraic integer
+    $\pi-\lambda$ and satisfying
+    $$
+    N\mid\operatorname{Norm}(\pi-\lambda).
+    $$
+    (When $\pi\in\mathbb Z$, this degenerates to the an integer form
+    in $\mathbb Z^2$). For a cusp fiber, the model is a congruence 
+    modulo $N$ on Neron polygons.
+- **Level record:** For a smooth fiber, levels are sublattices indexed by conductor $f$, with torsion invariant
+    $$
+    \mathcal L_f/(\pi-\lambda)\mathcal L_f.
+    $$
+    For a cusp fiber, each level is a Frobenius stable Neron $d$-gon with invariants
+    $\mu_{N/d}\times\mathbb Z/d\mathbb Z$.
 
 ### Example: $t=-49$, $D_K=-555$, fiber count $36$
 
@@ -179,7 +181,7 @@ FiberRecordFq
 ## Symmetric-power and Hecke traces
 
 The fiber decomposition by trace gives the Frobenius trace on
-$\operatorname{Sym}^k$. For cusp forms, this corresponds to Hecke operators
+$\text{Sym}^k$. For cusp forms, this corresponds to Hecke operators
 in weight $k+2$.
 
 ```python

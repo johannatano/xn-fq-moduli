@@ -1,41 +1,30 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from math import gcd, lcm
-from typing import TYPE_CHECKING
+from math import gcd
 
 from ...arithmetic.algebra import NeronDgon
-from ...arithmetic.common import divisors, factorize, valuation as vl
+from ...arithmetic.common import divisors
 from ...arithmetic.function import phi
-from ..data import FiberRecord
+from ..data import EigenForm, EigenFormRecord, FiberRecord
 from ..modular_curve import CurveFiber
-from ...utils.logging import Colors, Logger
+from .data import FrobData
 
-if TYPE_CHECKING:
-    from .curve import ModularCurveFq
 
-class NeronDgonFq(NeronDgon):
-    def __init__(self, d: int, q: int, t:int):
-        super().__init__(d)
-        self.q = q
-        self.t = t
+CuspDatum = tuple[int, FrobData]
 
-CuspDatum = tuple[int, NeronDgonFq, list[int]]
-
-class CuspFqFiber(CurveFiber):
-    """The cusp contribution for a chosen level-N moduli problem."""
+class CuspFiberFq(CurveFiber):
+    """One cusp trace stratum containing one form per ``(lambda, d)``."""
 
     def __init__(
         self,
         gamma: "LevelStructure",
         t: int,
-        dgon: NeronDgonFq,
-        eigen_vals: list[int],
+        frob_data: FrobData,
     ):
         super().__init__(gamma)
         self.t = t
-        self.dgon = dgon
-        self.eigen_vals = eigen_vals
+        self.frob_data = frob_data
 
     def stable_lines_count_ell(self, l: int, a:int, e1: int, e2: int, scalar_only=False) -> int:
         """Count stable lines in the local quotient defined by `alpha`."""
@@ -59,40 +48,41 @@ class CuspFqFiber(CurveFiber):
             return Fraction(d2, g) * phi(1)(g)
 
     def count(self) -> Fraction:
-        g = gcd(self.gamma.N // self.dgon.d, self.dgon.d)
-        val = len(self.eigen_vals) * Fraction(1, g) * phi(1)(g) # simplified, removed d/d
-        # TODO: for gamma type == 0, we do not have to search the eigenvals, CRT gives #eigenvals g always.
-        # val = num_eigen_lines if self.gamma.type < 2 else (phi(-1)(self.gamma.N) if num_eigen_lines > 0 else 0)
-        val_aut = Fraction(val, 2) * self.gamma.weight(smooth=False)
-        return val_aut
+        return sum(self.level_counts().values(), Fraction(0))
+
+    def level_counts(self) -> dict[int, Fraction]:
+        """Return the contribution of each polygon level in this stratum."""
+
+        counts: dict[int, Fraction] = {}
+        for eigen_form in self.frob_data.eigen_forms:
+            d = eigen_form.form.d
+            g = gcd(self.gamma.N // d, d)
+            contribution = Fraction(1, g) * phi(1)(g)
+            counts[d] = counts.get(d, Fraction(0)) + contribution
+        weight = Fraction(self.gamma.weight(smooth=False), 2)
+        return {d: value * weight for d, value in counts.items()}
 
     def snapshot(self) -> FiberRecord:
         total = self.count()
-        """for ev in self.eigen_vals:
-            d1 = gcd(e, t * q - ev)
-            d2 = gcd(d, t - ev)
-            stable_lines = self.stable_lines_count(d1,d2)
-            print(
-                f"d={self.dgon.d}, e={e}, lam={ev}, inv={d1,d2}, stable_lines={stable_lines}, self.eigen_vals={self.eigen_vals}"
-            )
-            _ell_val = 1
-            for l,a in factorize(self.gamma.N):
-                _ell_val *= self.stable_lines_count_ell(l, a, vl(d1, l), vl(d2, l))
-            true_val = Fraction(self.dgon.d, g) * phi(1)(g) if d1 == e and d2 == d else 0
-            clr = Colors.DIM if stable_lines == 0 else Colors.BOLD
-            _val += stable_lines
-            if stable_lines != 0:
-                Logger.cprint(
-                    f"d={self.dgon.d}, e={e}, g={g}, lam={ev}, inv={d1,d2}, #lines={stable_lines}, d/g*phi(1)({g})={true_val}, _ell_val={_ell_val}, num_eigens={len(self.eigen_vals)}",
-                    clr,
-                )"""
+        level_counts = self.level_counts()
+        eigen_records = tuple(
+            EigenFormRecord(eigenform=eigen_form)
+            for eigen_form in self.frob_data.eigen_forms
+        )
         return FiberRecord(
             kind="cusp",
             t=self.t,
-            d=self.dgon.d,
+            d=None,
             total_count=total,
             normalized_count=total,
             total_mass=total,
+            eigenvalues=tuple(
+                eigen_form.eigenvalue
+                for eigen_form in self.frob_data.eigen_forms
+            ),
+            lattice_levels=tuple(sorted(level_counts)),
+            lattice_counts=tuple(sorted(level_counts.items())),
+            eigen_records=eigen_records,
         )
 
 def enum_d_gons(
@@ -102,18 +92,27 @@ def enum_d_gons(
     """Enumerate cusp strata compatible with the chosen level type."""
     strata: list[CuspDatum] = []
     lambdas = range(curve.N) if level_type == 0 else [1]
-    eigenvalues_by_stratum: dict[tuple[int, int], set[int]] = {}
-    _count = 0
+
     for t in (1, -1):
+        frob_data = FrobData(trace=t)
         for lam in lambdas:
             d1 = gcd(lam - t * curve.q, curve.N)
             d2 = gcd(lam - t, curve.N)
             if d1*d2 % curve.N != 0:
                 continue
+            # reverse iteration for the e | q-lambda
+            """for d in divisors(d2):
+                e = curve.N // d
+                if d1 % e != 0:
+                    continue
+                print(f"--t={t}, lam={lam}, inv={d1, d2}, d={d}, e={e}")"""
+            # we instead simply enumerate the divisible by d1
             m = curve.N // d1
             for k in divisors(d2 // m):
                 d = m * k
-                eigenvalues_by_stratum.setdefault((t, d), set()).add(lam)
-    for (t, d), eigen_vals in sorted(eigenvalues_by_stratum.items()):
-        strata.append((t, NeronDgonFq(d, curve.q, t), sorted(eigen_vals)))
+                e = curve.N // d
+                frob_data.eigen_forms.append(EigenForm(value=lam, form=NeronDgon(d)))
+
+        if frob_data.eigen_forms:
+            strata.append((t, frob_data))
     return strata

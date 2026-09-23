@@ -8,6 +8,48 @@ This makes the package useful both as a counting program and as an
 experimental companion to a theoretical description of the strata of
 `X_N`.
 
+## Run locally
+
+The project can be run directly from this repository. Requirements are Git and
+Python 3.11 or newer.
+
+Clone the repository, create an isolated environment, and install this local
+checkout together with the example dependencies:
+
+```bash
+git clone YOUR_REPOSITORY_URL
+cd xn-fq-moduli
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[examples]"
+```
+
+Run the examples directly from the repository:
+
+```bash
+python examples/xnfq_count.py --type 1 --N 11 --p 5 --n 1
+python examples/xnfq_interactive.py
+```
+
+The interactive plotting example requires a graphical environment. The
+editable install points Python at the checked-out source, so changes to the
+repository are immediately available.
+
+The optional PARI-backed path can be added with:
+
+```bash
+python -m pip install -e ".[pari]"
+```
+
+Use the PARI path by enabling the session option before computing:
+
+```python
+from xnfq.config import configure_session
+
+configure_session(use_pari=True)
+```
+
 ## Mathematical viewpoint
 
 The package treats a modular curve as a level structure together with a

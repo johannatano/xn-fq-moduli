@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
+from math import isqrt
 import time
 
 from sympy import nextprime, prevprime, primerange
@@ -9,6 +10,10 @@ from xnfq.config import apply_config_from_args
 from xnfq.moduli.modular_curve import X, X0, X1
 from utils.args import parse_example_args
 from utils.ui.dashboard import Dashboard, Param
+
+MAX_PRIME_START = 100_000
+MAX_WINDOW_SIZE = 50
+MAX_TRACE_WORK = 1_000
 
 
 def XN_over(level_type: int, N: int, p: int):
@@ -36,8 +41,22 @@ class HeckeTracePlotView(Dashboard):
             Param("N", 1, 100, 11, step=1, label="level N"),
             Param("k", 0, 20, 2, step=1, label="symmetric power k"),
             Param("type", 0, 2, 1, step=1, label="curve type"),
-            Param("prime_start", 2, 10_000_000, 5, step=1, label="starting prime"),
-            Param("window_size", 1, 5_000, 1_000, step=1, label="primes per window"),
+            Param(
+                "prime_start",
+                2,
+                MAX_PRIME_START,
+                5,
+                step=1,
+                label="starting prime",
+            ),
+            Param(
+                "window_size",
+                1,
+                MAX_WINDOW_SIZE,
+                25,
+                step=1,
+                label="primes per window",
+            ),
         ]
 
     def panels(self):
@@ -86,12 +105,35 @@ class HeckeTracePlotView(Dashboard):
             return self._cache_data
 
         N, k, level_type, prime_start, window_size = key
+        estimated_work = window_size * max(1, isqrt(prime_start)) * max(1, N // 10)
+        if estimated_work > MAX_TRACE_WORK:
+            message = (
+                "Window skipped: reduce starting prime, window size, or level "
+                f"(estimated work {estimated_work:,}, limit {MAX_TRACE_WORK:,})."
+            )
+            self._cache_key = key
+            self._cache_data = {
+                "p": prime_start,
+                "N": N,
+                "k": k,
+                "type": level_type,
+                "prime_start": prime_start,
+                "window_size": window_size,
+                "traces": [],
+                "elapsed": 0.0,
+                "error": message,
+            }
+            return self._cache_data
+
         primes = self.prime_window(prime_start, window_size)
         started = time.perf_counter()
         traces: list[tuple[int, int | Fraction]] = []
+        
         for p in primes:
             curve = XN_over(level_type, N, p)
-            traces.append((p, curve.tr_frob_symk(k)))
+            # we use k+2, k-1+2=k+1
+            norm = curve.tr_frob_symk(k) / p**((k+1)//2)
+            traces.append((p, norm))
 
         self._cache_key = key
         self._cache_data = {
@@ -102,6 +144,7 @@ class HeckeTracePlotView(Dashboard):
             "window_size": window_size,
             "traces": traces,
             "elapsed": time.perf_counter() - started,
+            "error": None,
         }
         return self._cache_data
 
@@ -114,6 +157,21 @@ class HeckeTracePlotView(Dashboard):
         window_size = snapshot["window_size"]
         traces = snapshot["traces"]
         label = curve_label(level_type)
+        error = snapshot.get("error")
+
+        ax.set_title(f"Tr Sym^{k}(Frob_p) for {label}({N})")
+        if error:
+            ax.text(
+                0.5,
+                0.5,
+                error,
+                ha="center",
+                va="center",
+                wrap=True,
+                transform=ax.transAxes,
+            )
+            ax.set_axis_off()
+            return
 
         if traces:
             primes = [p for p, _ in traces]
@@ -130,7 +188,6 @@ class HeckeTracePlotView(Dashboard):
         else:
             ax.text(0.5, 0.5, "no primes in selected range", ha="center", va="center")
 
-        ax.set_title(f"Tr Sym^{k}(Frob_p) for {label}({N})")
         ax.set_xlabel("q = p")
         ax.set_ylabel("final trace value")
         ax.grid(color="0.92", linewidth=0.8)

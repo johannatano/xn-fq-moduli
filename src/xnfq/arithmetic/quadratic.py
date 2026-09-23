@@ -22,7 +22,6 @@ class QuadraticNumberField(NumberField):
         d = DK if DK % 4 == 1 else DK // 4
         return cls(d)
 
-
 @dataclass(frozen=True, init=False)
 class BicyclicPSylow(PSylow):
     """A bicyclic p-primary group recorded by exponent data."""

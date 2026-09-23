@@ -1,29 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from fractions import Fraction
-from math import prod, sqrt, comb, gcd
-
-
-from ..arithmetic.common import (
-    divisors,
-    factorize,
-    legendre,
-    valuation as vl,
-    kronecker,
-)
-from ..arithmetic.forms import BinaryQuadraticForm
-from ..arithmetic.function import Phi, phi
-from ..arithmetic.quadratic import LatticeTower, QuadraticOrderElement
-from ..arithmetic.algebra import NeronDgon
-from ..config import get_config, get_pari
-from .data import FiberRecord, LevelStructureRecord, StructureReport
+from .data import FiberRecord, StructureReport
 from .level_structures import Gamma, Gamma0, Gamma1, LevelStructure
-
-
-from ..utils.logging import Logger, Colors
-from ..utils.fmt import fmt_factored
-
 
 class ModularCurve:
     """Base moduli problem at level `N`, independent of a finite field."""

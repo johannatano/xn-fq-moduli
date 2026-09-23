@@ -198,6 +198,7 @@ class Dashboard(ABC):
                 p.slider_max,
                 valinit=p.slider_value,
                 valstep=p.slider_step,
+                dragging=False,
             )
             slider.valtext.set_text(p.format_value())
             slider.on_changed(self._slider_callback(p.name))

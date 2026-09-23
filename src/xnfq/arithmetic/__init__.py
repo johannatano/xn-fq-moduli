@@ -1,1 +1,1 @@
-"""Arithmetic helpers for x1fq_moduli."""
+"""Arithmetic building blocks used by :mod:`xnfq`."""

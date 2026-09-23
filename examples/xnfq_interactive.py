@@ -81,10 +81,8 @@ class XNFqPlotView(Dashboard):
                     + fiber.total_count
                 )
             elif fiber.kind == "cusp":
-                cusp_by_d[fiber.d] = (
-                    cusp_by_d.get(fiber.d, Fraction(0))
-                    + fiber.total_count
-                )
+                for d, contribution in fiber.lattice_counts:
+                    cusp_by_d[d] = cusp_by_d.get(d, Fraction(0)) + contribution
 
         yn_count = sum(smooth_by_dk.values(), start=Fraction(0))
         cusp_count = sum(cusp_by_d.values(), start=Fraction(0))

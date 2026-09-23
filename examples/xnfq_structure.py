@@ -131,7 +131,8 @@ def format_eigenform_fiber_data(s_rec: FiberRecord, data: EigenFormRecord, q:int
 def format_cusp_fiber_data(data: FiberRecord) -> list[ResultData]:
     return [
         ResultData("row", "cusp"),
-        ResultData("d", data.d),
+        ResultData("d-levels", data.lattice_counts),
+        ResultData("eigenvalues", data.eigenvalues),
         ResultData("t", data.t),
         ResultData("count", data.total_count),
     ]

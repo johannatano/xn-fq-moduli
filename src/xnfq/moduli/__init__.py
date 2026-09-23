@@ -1,1 +1,1 @@
-"""Moduli helpers for x1fq_moduli."""
+"""Modular-curve level structures and finite-field fiber decompositions."""

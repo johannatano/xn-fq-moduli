@@ -1,23 +1,8 @@
 from __future__ import annotations
 from math import gcd
-from ..config import get_config, get_pari
+from ..config import get_pari
 
-pari = get_pari()
 """ Number theory basics """
-def euler_phi(n):
-    result = n
-    for p, _ in factorize(n):
-        result -= result // p
-    return result
-
-def jordan_totient(n):
-    """Number of elements of exact order n in (Z/n x Z/n) — counts pairs of generators."""
-    result = n**2
-    for p, _ in factorize(n):
-        result *= p**2 - 1
-        result //= p**2
-    return result
-
 def kronecker(D, n):
     """Kronecker symbol (D/n) for n >= 1."""
     if n == 0:
@@ -44,27 +29,12 @@ def kronecker(D, n):
 
 def legendre(a, p):
     return kronecker(a, p)
-    if p == 2:
-        return 0 if a % 2 == 0 else (1 if a % 8 in (1, 7) else -1)
-    a = a % p
-    if a == 0:
-        return 0
-    r = pow(a, (p - 1) // 2, p)
-    return -1 if r == p - 1 else 1
 
 
 """ Factorizations """
-def coprime_part(n: int, m: int) -> int:
-    """Largest divisor of n coprime to m — strips all primes of m from n."""
-    import math
-    g = math.gcd(n, m)
-    while g > 1:
-        n //= g
-        g = math.gcd(n, m)
-    return n
-
 def factorize(n):
     """Return list of (prime, exponent) pairs for n > 1."""
+    pari = get_pari()
     if pari:
         return list(pari.factorint(n).items())
         #from sympy import factorint
@@ -95,14 +65,6 @@ def divisors(n):
     return sorted(divs)
 
 
-""" integer sign and equivalence functions """
-def sgn(x):
-    return 1 if x > 0 else -1 if x < 0 else 0
-
-def equiv(a, b):
-    val = a % b
-    return -1 if val == b - 1 else val
-
 """ p-adic valuation, supports n = 0 returns inf """
 def valuation(n, p):
     if n == 0:
@@ -112,9 +74,3 @@ def valuation(n, p):
         n //= p
         v += 1
     return v
-
-""" other arithmetic functions """
-def convolve(a, b):
-    def c(n):
-        return sum(a(d) * b(n // d) for d in divisors(n))
-    return c

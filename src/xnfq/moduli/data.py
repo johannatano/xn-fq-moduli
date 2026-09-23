@@ -8,12 +8,14 @@ if TYPE_CHECKING:
 
 if TYPE_CHECKING:
     from ..arithmetic.forms import BinaryQuadraticForm
+    from ..arithmetic.algebra import NeronDgon
 
 
 @dataclass
 class EigenForm:
-    eigenvalue: int
-    form: "BinaryQuadraticForm"
+    """One global eigenvalue together with its model form."""
+    value: int
+    form: "BinaryQuadraticForm | NeronDgon"
 
 @dataclass(frozen=True)
 class LevelStructureRecord:
@@ -32,7 +34,6 @@ class LevelStructureRecord:
 class EigenFormRecord:
     """A global eigenvalue together with its local structure across all primes."""
     eigenform: EigenForm
-    base_form: "BinaryQuadraticForm"
     level_records: tuple[LevelStructureRecord, ...] = ()
 
 @dataclass(frozen=True)
@@ -41,20 +42,23 @@ class FiberRecord:
 
     kind: str
     t: int
-    d: int
+    d: int | None
     total_count: Fraction = Fraction(0)
     normalized_count: Fraction = Fraction(0)
     total_mass: Fraction = Fraction(0)
     conductors: tuple[int, ...] = ()
     coprime: tuple[int, ...] = ()
     eigen_records: tuple[EigenFormRecord, ...] = ()
+    eigenvalues: tuple[int, ...] = ()
+    lattice_levels: tuple[int, ...] = ()
+    lattice_counts: tuple[tuple[int, Fraction], ...] = ()
 
     @property
     def trace(self) -> int:
         return self.t
 
     @property
-    def discriminant(self) -> int:
+    def discriminant(self) -> int | None:
         return self.d
 
 @dataclass(frozen=True)

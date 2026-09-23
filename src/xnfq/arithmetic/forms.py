@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from fractions import Fraction
 from math import gcd, isqrt
 from typing import Protocol
@@ -79,9 +78,6 @@ class BinaryQuadraticForm(Form):
                 out.append((a, b, c))
         return out
 
-    def H(D: int) -> int:
-        return len(BinaryQuadraticForm.reduced_triples(D))
-
     def h(D: int) -> int:
         return sum(
             1
@@ -122,21 +118,3 @@ class BinaryQuadraticForm(Form):
         """
         return type(self)(self.A, self.B + 2 * self.A * a, self.A * a * a + self.B * a + self.C)
 
-    def to_D0_basis(self) -> "BinaryQuadraticForm":
-        if self.C == 0:
-            return (0, 0)
-        h = self.B // 2
-        trace_zero_form = self.shift(-h) # we move to (1,{0,1}, N')
-        even_parity = trace_zero_form.B % 2 == 0
-        _D0 = 1
-        _c = 1
-        # reduced discr, remove 4 factor, so either odd or we add abck 4 later
-        disc = trace_zero_form.C if even_parity else (1 - 4 * trace_zero_form.C)
-        for l, a in factorize(abs(disc)):
-            c_exp = a // 2
-            d_exp = a % 2
-            _c *= l ** c_exp
-            _D0 *= l ** d_exp
-        if even_parity:
-            _D0 *= 4
-        return (-_D0, _c)

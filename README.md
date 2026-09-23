@@ -143,7 +143,7 @@ FiberRecordFq
     collection of eigenform records.
 - **Eigenform record:** For a smooth fiber, the model is the binary quadratic
     form $(1,t,q)$ shifted by $-\lambda$, giving the algebraic integer
-    $\pi-\lambda$ and satisfying $N\mid\operatorname{Norm}(\pi-\lambda)$.
+    $\pi-\lambda$ and satisfying $N\mid\text{Norm}(\pi-\lambda)$.
     (When $\pi\in\mathbb Z$, this degenerates to an integer form
     in $\mathbb Z^2$). For a cusp fiber, the model is a congruence 
     modulo $N$ on Neron polygons.

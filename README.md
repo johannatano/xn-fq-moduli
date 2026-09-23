@@ -143,17 +143,12 @@ FiberRecordFq
     collection of eigenform records.
 - **Eigenform record:** For a smooth fiber, the model is the binary quadratic
     form $(1,t,q)$ shifted by $-\lambda$, giving the algebraic integer
-    $\pi-\lambda$ and satisfying
-    $$
-    N\mid\operatorname{Norm}(\pi-\lambda).
-    $$
-    (When $\pi\in\mathbb Z$, this degenerates to the an integer form
+    $\pi-\lambda$ and satisfying $N\mid\operatorname{Norm}(\pi-\lambda)$.
+    (When $\pi\in\mathbb Z$, this degenerates to an integer form
     in $\mathbb Z^2$). For a cusp fiber, the model is a congruence 
     modulo $N$ on Neron polygons.
 - **Level record:** For a smooth fiber, levels are sublattices indexed by conductor $f$, with torsion invariant
-    $$
-    \mathcal L_f/(\pi-\lambda)\mathcal L_f.
-    $$
+    $\mathcal L_f/(\pi-\lambda)\mathcal L_f$.
     For a cusp fiber, each level is a Frobenius stable Neron $d$-gon with invariants
     $\mu_{N/d}\times\mathbb Z/d\mathbb Z$.
 

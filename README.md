@@ -181,23 +181,23 @@ FiberRecordFq
 ## Symmetric-power and Hecke traces
 
 The fiber decomposition by trace gives the Frobenius trace on
-$\text{Sym}^k$. For cusp forms, this corresponds to Hecke operators
-in weight $k+2$.
+$\text{Sym}^{k+2}$.
 
 ```python
 trace = curve.tr_frob_symk(k)
 ```
 
-The example includes an optional Sage comparison to verify the result. This
-comparison is slow; use small levels, for example $N<20$, and small values of
-$q$. For full level (type 2), the comparison currently agrees when
-$N\mid q-1$.
+The example includes an optional Sage comparison to verify the result.
 
 ```bash
 python examples/tr_frob_symk.py -N 11 --type 1 --sage -p 43 --use-pari
 ```
+> **Note:** Sage verification is extremely slow; use small $N$ and $q$.
+> For full level (type 2), the comparison is correct only when
+> $N\mid q-1$.
 
-The interactive Hecke demo plots prime power traces across a range
+An example plotting many traces over prime powers recovers the Hecke trace on
+$S_{k+2}$.
 
 ```bash
 python examples/hecke_trace_plot.py -N 100 -k 2 --type 1 -p 2000
@@ -208,7 +208,6 @@ python examples/hecke_trace_plot.py -N 100 -k 2 --type 1 -p 2000
 
 ## TODO
 
-- Add a cached database for class numbers; this is currently the slowest part.
-- Add a lattice-structure view.
-- Compare $H$ and $\Gamma$ via the $\tau$ embedding, recovering $\tau$ from
-    each lattice.
+- Add precomputed class numbers database.
+- Probe individual lattice structures $(N, \pi-\lambda)$ to recover isogeny graphs.
+- Embed lattice orders $\mathbb{Z} \oplus \mathbb{Z}\tau$ into the full modular curve $\mathbb{H} \setminus \Gamma$.

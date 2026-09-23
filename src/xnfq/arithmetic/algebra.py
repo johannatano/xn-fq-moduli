@@ -123,15 +123,6 @@ class NumberField(FieldExtension):
         super().__init__(base_field=RationalField(), degree=degree, basis=basis)
 
 
-class NeronDgon:
-    def __init__(self, d: int):
-        self.d = d
 
-    def torsion_subgroup(self, n: int) -> tuple[int, int]:
-        """Return the invariant factors of the ``n``-torsion subgroup."""
-
-        if n % self.d != 0:
-            return (0, 0)
-        return (n // self.d, self.d)
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Sequence
 import inspect
 
-from ui.base import Drawable, Param
+from .base import Drawable, Param
 
 __all__ = [
     "ImplicitFunctionView",

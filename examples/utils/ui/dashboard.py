@@ -31,7 +31,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Callable, Sequence
 
-from ui.base import Param
+from .base import Param
 
 __all__ = ["Dashboard", "Param", "TablePanel"]
 
@@ -45,7 +45,10 @@ class Dashboard(ABC):
 
     title: str = "dashboard"
     figsize: tuple[float, float] = (13.0, 7.0)
-    control_width: float = 0.22
+    control_width: float = 0.18
+    control_gap: float = 0.08
+    use_text_inputs: bool = False
+    text_input_names: set[str] = set()
 
     def __init__(self, **overrides) -> None:
         self._params: dict[str, Param] = {p.name: p for p in self.params()}
@@ -136,9 +139,14 @@ class Dashboard(ABC):
         self._fig = plt.figure(figsize=self.figsize)
         names = list(self.panels())
 
-        reserve = self.control_width if (interactive and self._has_widgets()) else 0.02
+        has_widgets = interactive and self._has_widgets()
+        reserve = (
+            self.control_width + self.control_gap
+            if has_widgets
+            else 0.02
+        )
         grid = self._fig.add_gridspec(
-            1, len(names), left=0.06, right=1.0 - reserve - 0.04, wspace=0.28
+            1, len(names), left=0.06, right=1.0 - reserve, wspace=0.28
         )
         for i, name in enumerate(names):
             self._axes[name] = self._fig.add_subplot(grid[0, i])
@@ -182,7 +190,7 @@ class Dashboard(ABC):
         return bool(self._slider_params() or self._actions)
 
     def _build_widgets(self) -> None:
-        from matplotlib.widgets import Button, Slider
+        from matplotlib.widgets import Button, Slider, TextBox
 
         left = 1.0 - self.control_width
         width = self.control_width - 0.04
@@ -191,18 +199,32 @@ class Dashboard(ABC):
 
         for p in self._slider_params():
             ax = self._fig.add_axes([left, top, width, height])
-            slider = Slider(
-                ax,
+            if self.use_text_inputs or p.name in self.text_input_names:
+                textbox = TextBox(ax, "", initial=p.format_value())
+                textbox.on_submit(self._text_callback(p.name))
+                self._widgets[p.name] = textbox
+            else:
+                slider = Slider(
+                    ax,
+                    "",
+                    p.slider_min,
+                    p.slider_max,
+                    valinit=p.slider_value,
+                    valstep=p.slider_step,
+                    dragging=False,
+                )
+                slider.valtext.set_text(p.format_value())
+                slider.on_changed(self._slider_callback(p.name))
+                self._widgets[p.name] = slider
+            ax.text(
+                -0.08,
+                0.5,
                 p.label,
-                p.slider_min,
-                p.slider_max,
-                valinit=p.slider_value,
-                valstep=p.slider_step,
-                dragging=False,
+                transform=ax.transAxes,
+                ha="right",
+                va="center",
+                clip_on=False,
             )
-            slider.valtext.set_text(p.format_value())
-            slider.on_changed(self._slider_callback(p.name))
-            self._widgets[p.name] = slider
             top -= height + gap
 
         top -= gap
@@ -233,12 +255,30 @@ class Dashboard(ABC):
 
         return _clicked
 
+    def _text_callback(self, name: str):
+        def _submit(value):
+            widget = self._widgets[name]
+            try:
+                self._params[name].set(value)
+            except (TypeError, ValueError):
+                widget.set_val(self._params[name].format_value())
+                return
+            widget.set_val(self._params[name].format_value())
+            self.on_change(name, self._params[name].value)
+            self.refresh()
+
+        return _submit
+
     def _sync_widgets(self) -> None:
         for name, p in self._params.items():
             widget = self._widgets.get(name)
-            if widget is not None and widget.val != p.slider_value:
+            if widget is None:
+                continue
+            if self.use_text_inputs or name in self.text_input_names:
+                widget.set_val(p.format_value())
+            elif widget.val != p.slider_value:
                 widget.set_val(p.slider_value)
-            if widget is not None:
+            if not (self.use_text_inputs or name in self.text_input_names):
                 widget.valtext.set_text(p.format_value())
 
 

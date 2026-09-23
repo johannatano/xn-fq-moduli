@@ -3,15 +3,16 @@ from __future__ import annotations
 from fractions import Fraction
 from math import gcd
 
-from ...arithmetic.algebra import NeronDgon
 from ...arithmetic.common import divisors
 from ...arithmetic.function import phi
-from ..data import EigenForm, EigenFormRecord, FiberRecord
+from .data import (
+    EigenForm,
+    EigenFormRecord,
+    CuspFiberRecordFq,
+    LevelStructureRecord,
+    CuspForm,
+)
 from ..modular_curve import CurveFiber
-from .data import FrobData
-
-
-CuspDatum = tuple[int, FrobData]
 
 class CuspFiberFq(CurveFiber):
     """One cusp trace stratum containing one form per ``(lambda, d)``."""
@@ -20,99 +21,67 @@ class CuspFiberFq(CurveFiber):
         self,
         gamma: "LevelStructure",
         t: int,
-        frob_data: FrobData,
+        eigen_forms: list[EigenForm],
     ):
         super().__init__(gamma)
         self.t = t
-        self.frob_data = frob_data
-
-    def stable_lines_count_ell(self, l: int, a:int, e1: int, e2: int, scalar_only=False) -> int:
-        """Count stable lines in the local quotient defined by `alpha`."""
-        if e1 + e2 < a:
-            return 0
-        if e1 * e2 == 0:
-            return l**e2
-        else:
-            return phi(1)(l**e2)
-
-    def stable_lines_count(
-        self, d1: int, d2: int, scalar_only=False
-    ) -> int:
-        """Count stable lines in the local quotient defined by `alpha`."""
-        if d1*d2 < self.gamma.N:
-            return 0
-        if d1 == 1 or d2 == 1:
-            return d2
-        else:
-            g = gcd(d1, d2)
-            return Fraction(d2, g) * phi(1)(g)
+        self.eigen_forms = eigen_forms
 
     def count(self) -> Fraction:
-        return sum(self.level_counts().values(), Fraction(0))
+        val = 0
+        for eigen_form in self.eigen_forms:
+            form = eigen_form.form
+            m = self.gamma.N // form.d1
+            for k in divisors(form.d2 // m):
+                d = m * k
+                e = self.gamma.N // d
+                g = gcd(self.gamma.N // d, d)
+                # note, we cancel the d in the numerator, since the true aut size  is 2d
+                val += Fraction(1, g) * phi(1)(g)
 
-    def level_counts(self) -> dict[int, Fraction]:
-        """Return the contribution of each polygon level in this stratum."""
+        return val * Fraction(1, 2) * self.gamma.weight(smooth=False)
 
-        counts: dict[int, Fraction] = {}
-        for eigen_form in self.frob_data.eigen_forms:
-            d = eigen_form.form.d
-            g = gcd(self.gamma.N // d, d)
-            contribution = Fraction(1, g) * phi(1)(g)
-            counts[d] = counts.get(d, Fraction(0)) + contribution
-        weight = Fraction(self.gamma.weight(smooth=False), 2)
-        return {d: value * weight for d, value in counts.items()}
+    def snapshot(self) -> CuspFiberRecordFq:
+        eigen_records = []
+        for eigen_form in self.eigen_forms:
+            form = eigen_form.form
+            m = self.gamma.N // form.d1
+            levels = []
+            for k in divisors(form.d2 // m):
+                d = m * k
+                e = self.gamma.N // d
+                g = gcd(self.gamma.N // d, d)
+                levels.append(LevelStructureRecord(inv=(e, d), mass=1, num_lines=Fraction(d, g) * phi(1)(g)))
+            eigen_records.append(
+                EigenFormRecord(
+                    eigenform=eigen_form,
+                    levels=levels
+                )
+            )
 
-    def snapshot(self) -> FiberRecord:
-        total = self.count()
-        level_counts = self.level_counts()
-        eigen_records = tuple(
-            EigenFormRecord(eigenform=eigen_form)
-            for eigen_form in self.frob_data.eigen_forms
-        )
-        return FiberRecord(
-            kind="cusp",
+        return CuspFiberRecordFq(
             t=self.t,
-            d=None,
-            total_count=total,
-            normalized_count=total,
-            total_mass=total,
-            eigenvalues=tuple(
-                eigen_form.eigenvalue
-                for eigen_form in self.frob_data.eigen_forms
-            ),
-            lattice_levels=tuple(sorted(level_counts)),
-            lattice_counts=tuple(sorted(level_counts.items())),
-            eigen_records=eigen_records,
+            count=self.count(),
+            eigen_records=tuple(eigen_records),
         )
 
 def enum_d_gons(
     curve: "ModularCurveFq",
     level_type: int,
-) -> list[CuspDatum]:
+) -> list[tuple[int, list[EigenForm]]]:
     """Enumerate cusp strata compatible with the chosen level type."""
-    strata: list[CuspDatum] = []
+    strata: list[tuple[int, list[EigenForm]]] = []
     lambdas = range(curve.N) if level_type == 0 else [1]
 
     for t in (1, -1):
-        frob_data = FrobData(trace=t)
+        eigen_forms = list[EigenForm]()
         for lam in lambdas:
             d1 = gcd(lam - t * curve.q, curve.N)
             d2 = gcd(lam - t, curve.N)
             if d1*d2 % curve.N != 0:
                 continue
-            # reverse iteration for the e | q-lambda
-            """for d in divisors(d2):
-                e = curve.N // d
-                if d1 % e != 0:
-                    continue
-                print(f"--t={t}, lam={lam}, inv={d1, d2}, d={d}, e={e}")"""
-            # we instead simply enumerate the divisible by d1
-            m = curve.N // d1
-            for k in divisors(d2 // m):
-                d = m * k
-                e = curve.N // d
-                frob_data.eigen_forms.append(EigenForm(value=lam, form=NeronDgon(d)))
+            eigen_forms.append(EigenForm(value=lam, form=CuspForm(d1, d2)))
 
-        if frob_data.eigen_forms:
-            strata.append((t, frob_data))
+        if eigen_forms:
+            strata.append((t, eigen_forms))
     return strata

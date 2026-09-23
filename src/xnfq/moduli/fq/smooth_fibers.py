@@ -15,9 +15,8 @@ from ...arithmetic.forms import BinaryQuadraticForm
 from ...arithmetic.function import Phi, phi
 from ...arithmetic.quadratic import LatticeTower, QuadraticOrderElement
 from ...config import get_config, get_pari
-from ..data import EigenForm, EigenFormRecord, FiberRecord, LevelStructureRecord
+from .data import EigenForm, EigenFormRecord, LevelStructureRecord, SmoothFiberRecordFq
 from ..modular_curve import CurveFiber
-from .data import FrobData
 
 from ..level_structures import LevelStructure
 
@@ -29,18 +28,14 @@ class SmoothFiberFq(CurveFiber):
         gamma: LevelStructure,
         t: int,
         frob_tower: LatticeTower,
-        frob_data: FrobData,
+        eigen_forms: list[EigenForm],
         mass: Fraction,
     ):
         super().__init__(gamma)
         self.t = t
         self.frob_tower = frob_tower
-        # if frob_data.base_form is None:
-        #    raise ValueError("smooth strata require a quadratic base form")
-        pi_form = frob_data.base_form
-        self.frob = QuadraticOrderElement.from_norm_form(frob_tower.OK, pi_form)
         self.m0 = mass  # * (1 if self.base.level_structure.type > 0 else 2)
-        self.frob_data = frob_data
+        self.eigen_forms = eigen_forms
         self.chi_K = frob_tower.chi_K
 
     def stable_lines_count(
@@ -62,18 +57,13 @@ class SmoothFiberFq(CurveFiber):
         alpha: QuadraticOrderElement,
     ) -> LevelStructureRecord:
         """Build the conductor-`f` record for one global eigenvalue modulo `N`."""
-
-        alpha_local = self.frob_tower.order(f).embed_suborder(alpha.form)
+        alpha_local = self.frob_tower.order(f).embed_suborder(alpha)
         """Build the conductor-`f` record for one global eigenform modulo `N`."""
-        im = [1, 1]
         ker = [1, 1]
         num_lines = 1
         scalar = True
         for l, a in prime_powers:
-            im_local = alpha_local.ell_invariants(l)
             ker_local = alpha_local.ell_kernel(l, a)
-            for idx, exp in enumerate(im_local):
-                im[idx] *= l**exp
             for idx, exp in enumerate(ker_local):
                 ker[idx] *= l**exp
             num_lines *= self.stable_lines_count(l, a, alpha_local)
@@ -84,8 +74,7 @@ class SmoothFiberFq(CurveFiber):
             order=self.frob_tower.order(f),
             mass=self.local_mass(f),
             coords=alpha_local.coords,
-            im=tuple(im),
-            ker=tuple(ker),
+            inv=tuple(ker),
             num_lines=num_lines,
             scalar=scalar,
         )
@@ -108,9 +97,8 @@ class SmoothFiberFq(CurveFiber):
         else:
             c_N = prod(l**a for l, a in c_N_support.items())
 
-        for eigen_form in self.frob_data.eigen_forms:
+        for eigen_form in self.eigen_forms:
             alpha = QuadraticOrderElement.from_norm_form(self.frob_tower.OK, eigen_form.form)
-            # alpha = self.frob.shift(-lam)
             for d in divisors(c_N):
                 e = self.frob_tower.f_max // d  # TODO: check correct for (p,N) neq 1, ie might use c_N here
                 n1 = gcd(alpha.u, e, self.N)  
@@ -129,8 +117,8 @@ class SmoothFiberFq(CurveFiber):
         eigen_records: list[EigenFormRecord] = []
         prime_powers = tuple(factorize(self.N))
         conductors = tuple(self.frob_tower.conductor_divisors())
-        for eigen_form in self.frob_data.eigen_forms:
-            # alpha = self.frob.shift(-lam)
+
+        for eigen_form in self.eigen_forms:
             alpha = QuadraticOrderElement.from_norm_form(self.frob_tower.OK, eigen_form.form)
             level_records = [
                 self.local_level_record(prime_powers, f, alpha) for f in conductors
@@ -138,35 +126,26 @@ class SmoothFiberFq(CurveFiber):
             eigen_records.append(
                 EigenFormRecord(
                     eigenform=eigen_form,
-                    level_records=tuple(level_records),
+                    levels=tuple(level_records),
                 )
             )
         return tuple(eigen_records)
 
-    def snapshot(self) -> FiberRecord:
+    def snapshot(self) -> SmoothFiberRecordFq:
         eigen_records = self.get_structure()
-        return FiberRecord(
-            kind="weil",
+        return SmoothFiberRecordFq(
             t=self.t,
-            d=self.frob_tower.DK,
-            total_count=self.count(),
-            normalized_count=sum(
-                record.num_lines
-                for eigen_record in eigen_records
-                for record in eigen_record.level_records
-            ),
-            total_mass=self.m0 * sum(self.local_mass(f) for f in self.frob_tower.conductor_divisors()),
-            conductors=tuple(self.frob_tower.conductor_divisors()),
-            coprime=tuple(self.frob_tower.split(self.N)[1]),
+            D_K=self.frob_tower.DK,
+            count=self.count(),
             eigen_records=eigen_records,
         )
 
 
-SmoothDatum = tuple[int, LatticeTower, FrobData]
-
-def enum_weil_q(curve: "ModularCurveFq") -> list[SmoothDatum]:
+def enum_weil_q(
+    curve: "ModularCurveFq",
+) -> list[tuple[int, LatticeTower, list[EigenForm]]]:
     """Enumerate the trace strata `(t, tower)` over `F_{p^n}`."""
-    strata: list[SmoothDatum] = []
+    strata: list[tuple[int, LatticeTower, list[EigenForm]]] = []
     p, q = curve.p, curve.q
     HB = int(2 * sqrt(q))
     config = get_config()
@@ -184,7 +163,6 @@ def enum_weil_q(curve: "ModularCurveFq") -> list[SmoothDatum]:
         classes: dict[int, list[int]] = {}
         for residue, sign in trace_class_residues():
             for t in range(residue, HB_local + 1, curve.N):
-                # only want one sign for t == 0
                 if t == 0 and sign == -1:
                     continue
                 trace = sign * t
@@ -203,61 +181,40 @@ def enum_weil_q(curve: "ModularCurveFq") -> list[SmoothDatum]:
     def get_frob_data(
         t: int,
         signs: list[int],
-    ) -> list[FrobData]:
-        frob_data: list[FrobData] = []
-        # allowed_split_types = [0, 1] if curve.level_structure.scalar_only else [0, 1]
+    ) -> list[tuple[int, list[EigenForm]]]:
+        data: list[tuple[int, list[EigenForm]]] = []
         D = t * t - 4 * q
         for s in signs:
             trace = s * t
             if not is_valid(D, trace):
                 continue
-
             lambdas = range(curve.N) if curve.level_structure.type == 0 else [1]
             base_form = BinaryQuadraticForm(1, trace, q)
-            data = FrobData(trace, base_form)
+            eigen_forms: list[EigenForm] = []
             for lam in lambdas:
-                alpha = base_form.shift(-lam)
                 norm = base_form.A * lam * lam - base_form.B * lam + base_form.C
                 if norm % curve.N != 0:
                     continue
-                data.eigen_forms.append(EigenForm(lam, alpha))
-            frob_data.append(data)
+                eigen_forms.append(EigenForm(lam, base_form.shift(-lam)))
 
-        """for l, a in factorize(curve.N):
-            split_type = kronecker(D, l)
-            for data in frob_data:
-                base_form = BinaryQuadraticForm(1, data.trace, q)
-                if split_type in allowed_split_types:
-                    modulus = l**a
-                    lambdas = range(modulus) if curve.level_structure.type == 0 else [1]
-                    for lam in lambdas:
-                        alpha = base_form.shift(-lam)
-                        #shifted_c = base_form.A * lam * lam - base_form.B * lam + base_form.C
-                        if alpha.norm % modulus != 0:
-                            continue
-                        data.eigen_forms.append(EigenForm(lam, alpha))"""
-        # values = get_eigenvals(base_form, l, a)
-        # data.p_eigenvalues[l] = FrobDataPLocal(
-        #    l, a, split_type, values
-        # )
-        # for data in frob_data:
-        #    data.compute_global_eigenvalues(curve.N)
-        return frob_data
+            if not eigen_forms:
+                continue
+            data.append((trace, eigen_forms))
+        return data
 
     def get_fibers_over_t(t: int, signs: list[int] = None) -> list[WeilDatum]:
 
         if signs is None:
             signs = t_signs(t)
-
-        frob_data = get_frob_data(t, signs)
-        surviving = [data for data in frob_data if data.survives()]
-        # if not surviving:
-        #    return []
+        data = get_frob_data(t, signs)
+        
+        if not data:
+            return []
         # NOTE: We only construct ONE tower and reuse, since L(pi)=L(-pi) in tower structure, and it is expensive to find D0.
         base_form = BinaryQuadraticForm(1, t, q)
         DK, f = BinaryQuadraticForm._D0(base_form.discriminant, pari=pari)
         tower = LatticeTower(DK, f, base_form, exclude=p)
-        return [(data.trace, tower, data) for data in frob_data]
+        return [(trace, tower, eigen_forms) for trace, eigen_forms in data]
 
     # in the case of Gamma1, we might speed up t^2 <= 4q enumeration by solving explicit residues for pm(q+1) % N
     if config.fast_trace and curve.level_structure.type == 1:

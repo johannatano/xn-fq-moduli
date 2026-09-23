@@ -42,7 +42,6 @@ class ModularCurveFq(ModularCurve):
     def smooth_fibers(self):
         """Yield the non-cuspidal Frobenius strata over `F_q`."""
         from .smooth_fibers import SmoothFiberFq, enum_weil_q
-
         for t, tower, frob_data in enum_weil_q(self):
             mass = Fraction(
                 _mK(tower.DK, self.p) * _d0(tower.DK, self.p, t), _uK(tower.DK)

@@ -30,13 +30,15 @@ def kronecker(D, n):
 def legendre(a, p):
     return kronecker(a, p)
 
-
 """ Factorizations """
 def factorize(n):
     """Return list of (prime, exponent) pairs for n > 1."""
     pari = get_pari()
     if pari:
-        return list(pari.factorint(n).items())
+        return [
+            (int(prime), int(exponent))
+            for prime, exponent in pari.factorint(n).python()
+        ]
         #from sympy import factorint
         #return list(factorint(n).items())
     factors = []

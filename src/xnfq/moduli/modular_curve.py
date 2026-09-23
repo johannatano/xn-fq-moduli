@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from .data import FiberRecord, StructureReport
+from .data import FiberRecord
 from .level_structures import Gamma, Gamma0, Gamma1, LevelStructure
+
 
 class ModularCurve:
     """Base moduli problem at level `N`, independent of a finite field."""
@@ -19,13 +20,9 @@ class ModularCurve:
     def change_base(self, p: int, n: int) -> "ModularCurveFq":
         return self.over(p, n)
 
-    def get_structure(self) -> StructureReport:
+    def get_structure(self) -> list[FiberRecord]:
         """Materialize the current fiber decomposition into serializable records."""
-        fibers = tuple(self.fibers())
-        return StructureReport(
-            problem=self.level_structure,
-            fibers=tuple(fiber.snapshot() for fiber in fibers),
-        )
+        return [fiber.snapshot() for fiber in self.fibers()]
 
     def fibers(self):
         yield from self.smooth_fibers()

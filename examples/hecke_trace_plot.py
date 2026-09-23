@@ -1,20 +1,14 @@
 from __future__ import annotations
 
-from fractions import Fraction
-from math import isqrt
+import sys
 import time
 
-from sympy import nextprime, prevprime, primerange
+from sympy import primerange
 
 from xnfq.config import apply_config_from_args
 from xnfq.moduli.modular_curve import X, X0, X1
 from utils.args import parse_example_args
 from utils.ui.dashboard import Dashboard, Param
-
-MAX_PRIME_START = 100_000
-MAX_WINDOW_SIZE = 50
-MAX_TRACE_WORK = 1_000
-
 
 def XN_over(level_type: int, N: int, p: int):
     if level_type == 0:
@@ -33,30 +27,25 @@ def curve_label(level_type: int) -> str:
 class HeckeTracePlotView(Dashboard):
     """Plot the symmetric-power Frobenius trace as the prime varies."""
 
-    title = "Hecke traces over prime fields"
+    title = "Hecke Trace"
     figsize = (11.0, 6.5)
+    use_text_inputs = True
+    prime_step = 1000
+    prime_window_size = 1000
+
+    def __init__(self, **overrides):
+        self.pmin = max(2, int(overrides.pop("pmin", 2)))
+        self.pmax = max(
+            self.pmin,
+            int(overrides.pop("pmax", self.pmin + self.prime_window_size - 1)),
+        )
+        super().__init__(**overrides)
 
     def params(self):
         return [
-            Param("N", 1, 100, 11, step=1, label="level N"),
-            Param("k", 0, 20, 2, step=1, label="symmetric power k"),
-            Param("type", 0, 2, 1, step=1, label="curve type"),
-            Param(
-                "prime_start",
-                2,
-                MAX_PRIME_START,
-                5,
-                step=1,
-                label="starting prime",
-            ),
-            Param(
-                "window_size",
-                1,
-                MAX_WINDOW_SIZE,
-                25,
-                step=1,
-                label="primes per window",
-            ),
+            Param("N", 1, 10_000, 100, step=1, label="N"),
+            Param("k", 0, 10_000, 2, step=1, label="k"),
+            Param("type", 0, 2, 1, step=1, label="Gamma"),
         ]
 
     def panels(self):
@@ -64,75 +53,45 @@ class HeckeTracePlotView(Dashboard):
 
     def actions(self):
         return {
-            "Previous prime window": self.previous_window,
-            "Next prime window": self.next_window,
+            "<< prev": self.previous_window,
+            "next >>": self.next_window,
         }
 
-    @staticmethod
-    def prime_window(start: int, size: int) -> list[int]:
-        """Return ``size`` consecutive primes starting at or above ``start``."""
-        primes: list[int] = []
-        candidate = max(2, start)
-        upper = max(candidate + 2, candidate * 2)
-        while len(primes) < size:
-            primes.extend(primerange(candidate, upper))
-            candidate = upper
-            upper *= 2
-        return primes[:size]
+    def primes(self) -> list[int]:
+        return list(primerange(self.pmin, self.pmax + 1))
 
     def previous_window(self) -> None:
-        primes = self.prime_window(self["prime_start"], self["window_size"])
-        start = primes[0]
-        for _ in range(self["window_size"]):
-            if start <= 2:
-                break
-            start = prevprime(start)
-        self.set("prime_start", start, redraw=False)
+        self.shift_window(-1)
 
     def next_window(self) -> None:
-        primes = self.prime_window(self["prime_start"], self["window_size"])
-        self.set("prime_start", nextprime(primes[-1]), redraw=False)
+        self.shift_window(1)
+
+    def shift_window(self, direction: int) -> None:
+        new_pmin = max(2, self.pmin + direction * self.prime_step)
+        actual_shift = new_pmin - self.pmin
+        self.pmin = new_pmin
+        self.pmax += actual_shift
+        self._cache_key = None
 
     def _snapshot(self):
         key = (
             self["N"],
             self["k"],
             self["type"],
-            self["prime_start"],
-            self["window_size"],
+            self.pmin,
+            self.pmax,
         )
         if getattr(self, "_cache_key", None) == key:
             return self._cache_data
 
-        N, k, level_type, prime_start, window_size = key
-        estimated_work = window_size * max(1, isqrt(prime_start)) * max(1, N // 10)
-        if estimated_work > MAX_TRACE_WORK:
-            message = (
-                "Window skipped: reduce starting prime, window size, or level "
-                f"(estimated work {estimated_work:,}, limit {MAX_TRACE_WORK:,})."
-            )
-            self._cache_key = key
-            self._cache_data = {
-                "p": prime_start,
-                "N": N,
-                "k": k,
-                "type": level_type,
-                "prime_start": prime_start,
-                "window_size": window_size,
-                "traces": [],
-                "elapsed": 0.0,
-                "error": message,
-            }
-            return self._cache_data
-
-        primes = self.prime_window(prime_start, window_size)
+        N, k, level_type, pmin, pmax = key
+        primes = list(primerange(pmin, pmax + 1))
         started = time.perf_counter()
-        traces: list[tuple[int, int | Fraction]] = []
-        
+        traces: list[tuple[int, float]] = []
+
         for p in primes:
             curve = XN_over(level_type, N, p)
-            # we use k+2, k-1+2=k+1
-            norm = curve.tr_frob_symk(k) / p**((k+1)//2)
+            norm = curve.tr_frob_symk(k) / p ** ((k + 1) / 2)
             traces.append((p, norm))
 
         self._cache_key = key
@@ -140,11 +99,10 @@ class HeckeTracePlotView(Dashboard):
             "N": N,
             "k": k,
             "type": level_type,
-            "prime_start": prime_start,
-            "window_size": window_size,
+            "pmin": pmin,
+            "pmax": pmax,
             "traces": traces,
             "elapsed": time.perf_counter() - started,
-            "error": None,
         }
         return self._cache_data
 
@@ -153,31 +111,24 @@ class HeckeTracePlotView(Dashboard):
         N = snapshot["N"]
         k = snapshot["k"]
         level_type = snapshot["type"]
-        prime_start = snapshot["prime_start"]
-        window_size = snapshot["window_size"]
+        pmin = snapshot["pmin"]
+        pmax = snapshot["pmax"]
         traces = snapshot["traces"]
         label = curve_label(level_type)
-        error = snapshot.get("error")
 
-        ax.set_title(f"Tr Sym^{k}(Frob_p) for {label}({N})")
-        if error:
-            ax.text(
-                0.5,
-                0.5,
-                error,
-                ha="center",
-                va="center",
-                wrap=True,
-                transform=ax.transAxes,
-            )
-            ax.set_axis_off()
-            return
+        ax.set_title(f"Tr(T_p | S_{k+2}({N}))")
 
         if traces:
             primes = [p for p, _ in traces]
             values = [float(trace) for _, trace in traces]
-            ax.plot(primes, values, marker="o", markersize=4, linewidth=1.2, color="steelblue")
-            ax.set_xlim(primes[0], primes[-1])
+            ax.plot(
+                primes,
+                values,
+                markersize=1,
+                linewidth=1.0,
+                color="black",
+            )
+            ax.set_xlim(pmin, pmax)
             y_min = min(values)
             y_max = max(values)
             if y_min == y_max:
@@ -188,42 +139,39 @@ class HeckeTracePlotView(Dashboard):
         else:
             ax.text(0.5, 0.5, "no primes in selected range", ha="center", va="center")
 
-        ax.set_xlabel("q = p")
-        ax.set_ylabel("final trace value")
-        ax.grid(color="0.92", linewidth=0.8)
-        ax.text(
-            0.98,
-            0.98,
-            (
-                f"primes={len(traces)}\n"
-                f"start={prime_start}\n"
-                f"window={window_size} primes\n"
-                f"range=[{traces[0][0]}, {traces[-1][0]}]\n"
-                f"time={snapshot['elapsed']:.3f}s"
-            ),
-            transform=ax.transAxes,
-            ha="right",
-            va="top",
-            bbox={"facecolor": "white", "edgecolor": "0.8", "boxstyle": "round,pad=0.4"},
-        )
-
+        ax.set_xlabel("p")
+        ax.tick_params(axis="y", labelleft=False)
+        ax.set_ylabel("a_p normalized")
+        ax.grid(color="grey", linewidth=.5)
+        
 
 def run() -> None:
     args = parse_args()
     apply_config_from_args(args)
-    HeckeTracePlotView(
-        N=args.N,
-        k=args.k,
-        type=args.type,
-        prime_start=args.p,
-    ).show()
+    overrides = {
+        "pmin": args.p,
+        "pmax": args.p + HeckeTracePlotView.prime_window_size - 1,
+    }
+    for name in ("N", "k", "type"):
+        value = getattr(args, name)
+        if value is not None:
+            overrides[name] = value
+    HeckeTracePlotView(**overrides).show()
 
 
 def parse_args():
-    return parse_example_args(
-        "Plot Tr Sym^k(Frob_p) over a prime range",
+    args = parse_example_args(
+        "Hecke Trace",
         include_sym_power=True,
     )
+    options = set(sys.argv[1:])
+    if not {"-N", "--N"} & options:
+        args.N = None
+    if not {"-type", "--type"} & options:
+        args.type = None
+    if "-k" not in options:
+        args.k = None
+    return args
 
 
 if __name__ == "__main__":

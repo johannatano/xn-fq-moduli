@@ -3,15 +3,10 @@
 Python software for counting points and studying the structure of modular curves over finite fields.
 
 ## Contents
-- [01. Overview](#01-modular-curve-and-fiber-structure)
+- [01. Overview](#01-overview)
 - [02. Installation](#02-installation)
 - [03. Documentation](#03-documentation)
-    - [3.1 Level Structure](#31-level-structure)
-    - [3.2 Modular Curve](#32-modular-curve)
-    - [3.3 Methods](#33-methods)
-- [04. Structure](#04-structure)
 - [04. Examples](#04-examples)
-- [05. Traces (short)](#05-traces-short)
 - [05. TODO](#05-todo)
 
 ## 01. Overview

@@ -11,9 +11,9 @@ Python software for counting points and studying the structure of modular curves
 
 ## 01. Overview
 We study $\mathbb F_q$-rational points $(E,\gamma)$ on modular curves, where $E$ is a generalized elliptic curve and $\gamma$ is a level-$N$ structure of unspecified type. By sending each point
-$$
+```math
 (E,\gamma)\;\mapsto\;E\;\mapsto\;t, \qquad t = a_p(E)
-$$
+```
 we naturally stratify the point count by $t$ allowing efficient computation of traces of modular forms.
 
 The fibers $\gamma$ over a fixed $E$ fall into two primary types — smooth fibers and cusp fibers. Over $\overline{\mathbb F}_q$ smooth fibers are modelled by level structures on $\mathbb Z/N\mathbb Z\times\mathbb Z/N\mathbb Z$, while cusp fibers are modelled via Néron $d$-gons $\mathbb F_q^{\times}\times\mathbb Z/d\mathbb Z$.
@@ -82,24 +82,19 @@ The count method returns the total number of $\mathbb{F}_q$-rational points over
 Y1, Cusp1 = X1(11).F(5**4).count()
 ```
 Both have the following universal structure on the internal strata over $t$
-
-$$
+```math
 \mathrm{eigen\_count}(t)=\sum_{\lambda}\;\sum_{L\in\mathrm{Levels}(\lambda)}\;\mathrm{num\_lines}(\lambda,L)\cdot\mathrm{mass}(L).
-$$
-
+```
 local levels are either sublattices indexed by conductor, with torsion invariant $\mathcal L_f/(\pi-\lambda)\mathcal L_f$, or Neron $d$-gon with invariants $\mu_{N/d}\times\mathbb Z/d\mathbb Z$.
 
 The final fiber count of $(E, \gamma)$ over $t$ is then obtained by multiplying the total eigen-count by the global weights
-
-$$
+```math
 \#\mathrm{fiber}(t)=m_0\cdot\mathrm{eigen\_count}(t)\cdot w_{\Gamma_i}.
-$$
-
+```
 where $m_0$ is global mass (class-number / automorphism factor) and $w_{\Gamma_i}$ gives the multiplicity of level $N$ structures per Frobenius stabale line as
-
-$$
+```math
 w_{\Gamma_0}=1,\qquad w_{\Gamma_1}=\varphi(N),\qquad w_{\Gamma(N)}=\varphi_{-1}(N).
-$$
+```
 
 #### 3.3.2 Generate Structure Report
 The fiber strata reveal deeper structure within each eigenform. The full report — including torsion invariants at each local level within the $t$-strata — can be inspected without additional expensive computations.
@@ -161,13 +156,11 @@ Compute Frobenius trace on the space of cusp forms of weight $k$ and level $N$ v
 X1(12).F(13**3).tr_fq(k)
 ```
 For an instantiated $X_i(N)(\mathbb{F}_q)$ we compute trace via the formula
-
-$$
+```math
 \mathrm{tr\_fq}(k)=
 -\sum_{t^2 \leq 4q} h_k(t,q,k-2)\cdot\#\mathrm{fiber}(t)
 -\sum_{t^2 = 1} t^{k}\cdot\#\mathrm{fiber}(t),
-$$
-
+```
 Here $h_k(t,q,m)$ denotes the complete homogeneous polynomial used above (implemented as `hk(t,q,k)` in `xnfq.moduli.fq.curve`).
 
 #### 3.3.3.1 Example : Basic usage
@@ -195,7 +188,7 @@ Computed 5 traces in 0.286272s
 ```bash
 python examples/tr_fq.py -p 13 -N 5 -k 2 --sage
 ```
-If `--sage` is given and Sage is available, `tr_fq.py` will attempt a reference trace per-prime (only for prime fields `n==1`). When `--sage` is used the table includes two extra columns `sage_ref` and `sage_err` showing the Sage reference trace and the absolute error. WARNING: The sage computation is very slow and is not feasable for $p > 100$ or $N > 20$
+If `--sage` is given and Sage is available, `tr_fq.py` will attempt a reference trace per-prime (only for prime fields `n==1`). When `--sage` is used the table includes two extra columns showing the Sage reference trace and the absolute error. WARNING: The sage computation is very slow and is not feasable for $p > 100$ or $N > 20$
 
 ## 04. Examples
 

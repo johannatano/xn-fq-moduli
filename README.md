@@ -161,11 +161,13 @@ Compute Frobenius trace on the space of cusp forms of weight $k$ and level $N$ v
 X1(12).F(13**3).tr_fq(k)
 ```
 For an instantiated $X_i(N)(\mathbb{F}_q)$ we compute trace via the formula
+
 $$
 \mathrm{tr\_fq}(k)=
 -\sum_{t^2 \leq 4q} h_k(t,q,k-2)\cdot\#\mathrm{fiber}(t)
 -\sum_{t^2 = 1} t^{k}\cdot\#\mathrm{fiber}(t),
 $$
+
 Here $h_k(t,q,m)$ denotes the complete homogeneous polynomial used above (implemented as `hk(t,q,k)` in `xnfq.moduli.fq.curve`).
 
 #### 3.3.3.1 Example : Basic usage

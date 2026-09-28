@@ -14,15 +14,14 @@ from ...arithmetic.common import (
 from ...arithmetic.forms import BinaryQuadraticForm
 from ...arithmetic.function import Phi, phi
 from ...arithmetic.quadratic import LatticeTower, QuadraticOrderElement
-from ...config import get_config, get_pari
+
 from .data import EigenForm, EigenFormRecord, LevelStructureRecord, SmoothFiberRecordFq
 from ..modular_curve import CurveFiber
 
 from ..level_structures import LevelStructure
+from ...config import get_pari
 
 class SmoothFiberFq(CurveFiber):
-    """A minimal wrapper around a Frobenius lattice tower and one trace sign."""
-
     def __init__(
         self,
         gamma: LevelStructure,
@@ -34,19 +33,19 @@ class SmoothFiberFq(CurveFiber):
         super().__init__(gamma)
         self.t = t
         self.frob_tower = frob_tower
-        self.m0 = mass  # * (1 if self.base.level_structure.type > 0 else 2)
+        self.m0 = mass
         self.eigen_forms = eigen_forms
         self.chi_K = frob_tower.chi_K
 
     def stable_lines_count(
-        self, l: int, a: int, alpha: QuadraticOrderElement, scalar_only=False
+        self, l: int, a: int, alpha: QuadraticOrderElement
     ) -> int:
         """Count stable lines in the local quotient defined by `alpha`."""
         e1, e2 = alpha.ell_invariants(l)
         if e2 < a:
             return 0
         if e1 < a:
-            return l**e1 if not scalar_only else 0
+            return l**e1
         else:
             return phi(-1)(l**a)
 
@@ -56,9 +55,7 @@ class SmoothFiberFq(CurveFiber):
         f: int,
         alpha: QuadraticOrderElement,
     ) -> LevelStructureRecord:
-        """Build the conductor-`f` record for one global eigenvalue modulo `N`."""
         alpha_local = self.frob_tower.order(f).embed_suborder(alpha)
-        """Build the conductor-`f` record for one global eigenform modulo `N`."""
         ker = [1, 1]
         num_lines = 1
         scalar = True
@@ -69,6 +66,10 @@ class SmoothFiberFq(CurveFiber):
             num_lines *= self.stable_lines_count(l, a, alpha_local)
             scalar = scalar and (vl(alpha_local.v, l) >= a)
 
+        gamma_count = num_lines * self.gamma.weight()
+        if not scalar and self.gamma.scalar_only:
+            gamma_count = 0
+
         return LevelStructureRecord(
             index=f,
             order=self.frob_tower.order(f),
@@ -76,6 +77,7 @@ class SmoothFiberFq(CurveFiber):
             coords=alpha_local.coords,
             inv=tuple(ker),
             num_lines=num_lines,
+            gamma_count=gamma_count,
             scalar=scalar,
         )
 
@@ -84,19 +86,15 @@ class SmoothFiberFq(CurveFiber):
 
     def count(self) -> Fraction:
         count = 0
-
         c_N_support, c_coprime = self.frob_tower.split(self.N)
-
         coprime = Phi(
             self.chi_K,
             prod(l**a for l, a in c_coprime.items()),
         )
-
         if self.frob_tower.DK == 0:
             c_N = 1
         else:
             c_N = prod(l**a for l, a in c_N_support.items())
-
         for eigen_form in self.eigen_forms:
             alpha = QuadraticOrderElement.from_norm_form(self.frob_tower.OK, eigen_form.form)
             for d in divisors(c_N):
@@ -136,6 +134,7 @@ class SmoothFiberFq(CurveFiber):
         return SmoothFiberRecordFq(
             t=self.t,
             D_K=self.frob_tower.DK,
+            m0=self.m0,
             count=self.count(),
             eigen_records=eigen_records,
         )
@@ -143,12 +142,12 @@ class SmoothFiberFq(CurveFiber):
 
 def enum_weil_q(
     curve: "ModularCurveFq",
+    fast_trace_enum: bool = False,
 ) -> list[tuple[int, LatticeTower, list[EigenForm]]]:
     """Enumerate the trace strata `(t, tower)` over `F_{p^n}`."""
     strata: list[tuple[int, LatticeTower, list[EigenForm]]] = []
     p, q = curve.p, curve.q
     HB = int(2 * sqrt(q))
-    config = get_config()
     pari = get_pari()
 
     def trace_class_residues() -> tuple[tuple[int, int], ...]:
@@ -207,7 +206,7 @@ def enum_weil_q(
         if signs is None:
             signs = t_signs(t)
         data = get_frob_data(t, signs)
-        
+
         if not data:
             return []
         # NOTE: We only construct ONE tower and reuse, since L(pi)=L(-pi) in tower structure, and it is expensive to find D0.
@@ -215,9 +214,8 @@ def enum_weil_q(
         DK, f = BinaryQuadraticForm._D0(base_form.discriminant, pari=pari)
         tower = LatticeTower(DK, f, base_form, exclude=p)
         return [(trace, tower, eigen_forms) for trace, eigen_forms in data]
-
     # in the case of Gamma1, we might speed up t^2 <= 4q enumeration by solving explicit residues for pm(q+1) % N
-    if config.fast_trace and curve.level_structure.type == 1:
+    if fast_trace_enum:
         for t, signs in trace_classes(HB).items():
             strata.extend(get_fibers_over_t(t, signs))
     else:

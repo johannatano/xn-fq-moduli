@@ -16,10 +16,26 @@ class ResultData(Data):
     flag: str = ""  # "non-zero" | "zero" | "negative" — triggers error color on the row
 
     def formatted(self) -> str:
+        # Support special formatter names
         if self.fmt == "factors":
-            from nt.arithmetic.common import fmt_factored
+            from utils.fmt import fmt_factored
             return fmt_factored(int(self.value))
-        return format(self.value, self.fmt) if self.fmt else str(self.value)
+
+        # If fmt looks like an ANSI color escape, treat it as a color wrapper
+        if self.fmt and "\033" in self.fmt:
+            try:
+                s = str(self.value)
+            except Exception:
+                s = repr(self.value)
+            return f"{self.fmt}{s}\033[0m"
+
+        # Otherwise treat fmt as a normal format specifier
+        if self.fmt:
+            try:
+                return format(self.value, self.fmt)
+            except Exception:
+                return str(self.value)
+        return str(self.value)
 
     def is_flagged(self) -> bool:
         if self.flag == "non-zero":

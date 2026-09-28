@@ -20,6 +20,7 @@ class LevelStructureRecord:
     coords: tuple[int, int] = field(default_factory=tuple)
     inv: tuple[int, int] = field(default_factory=tuple)
     num_lines: Fraction = Fraction(0)
+    gamma_count: int = 0
     scalar: bool = False
     order: QuadraticOrder = None
 

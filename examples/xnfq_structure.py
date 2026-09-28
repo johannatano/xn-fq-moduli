@@ -1,13 +1,10 @@
-# Generic imports
 from __future__ import annotations
-from math import sqrt, pi, gcd, prod, isqrt, comb
 from fractions import Fraction
 import time
 
-# X1 Library Specific Imports
 from xnfq.config import apply_config_from_args
 
-from xnfq.moduli import EigenFormRecord, CuspFiberRecordFq, SmoothFiberRecordFq, X, X0, X1
+from xnfq.moduli import EigenFormRecord, CuspFiberRecordFq, SmoothFiberRecordFq, ModularCurve, Gamma
 
 from xnfq.arithmetic.forms import BinaryQuadraticForm
 from xnfq.arithmetic.common import factorize
@@ -17,99 +14,86 @@ from utils.fmt import fmt_magnitude, fmt_factored, fmt_invariants
 from utils.logging import Logger, Colors
 from utils.data import ResultData
 
-from sympy import primerange
 
 def format_eigenform_data(
-    fiber: CuspFiberRecordFq | SmoothFiberRecordFq, eigenform_rec: EigenFormRecord, q: int, N: int
+    fiber: CuspFiberRecordFq | SmoothFiberRecordFq, eigenform_rec: EigenFormRecord, q: int, gamma: Gamma
 ) -> list[list[ResultData]]:
-    rows: list[list[ResultData]] = []
+    table: list[list[ResultData]] = []
     form = eigenform_rec.eigenform
-
     for level in eigenform_rec.levels:
-
+        row = []
         if fiber.kind == "smooth":
-            rows.append(
-                [
-                    ResultData("f", level.index),
-                    ResultData("mass", level.mass),
-                    ResultData("num_lines", level.num_lines),
-                    #ResultData(f"coords", level.coords),
-                    ResultData(f"inv", level.inv),
-                ]
-            )
+            row.append(ResultData("f", level.index))
         else:
-            rows.append(
-                [
-                    ResultData("d", level.inv[1]),
-                    ResultData("mass", level.mass),
-                    ResultData("num_lines", level.num_lines),
-                    ResultData(f"inv", level.inv),
-                ]
+            row.append(ResultData("d", level.inv[1]))
+        row.append(ResultData("mass", level.mass))
+        row.append(ResultData("inv", level.inv))
+        row.append(ResultData("stable lines", level.num_lines))
+        clr = Colors.DIM if level.gamma_count == 0 else Colors.BOLD
+        row.append(ResultData("structure count", level.gamma_count))
+        row.append(
+            ResultData(
+                "level contrib", level.gamma_count * level.mass * fiber.m0, fmt=clr
             )
-    return rows
+        )
+        table.append(row)
+    return table
 
-
-def XN_over(_type:int, N:int, p:int, n:int):
-    if _type == 0:
-        return X0(N).over(p, n)
-    elif _type == 1:
-        return X1(N).over(p, n)
-    elif _type == 2:
-        return X(N).over(p, n)
-    else:
-        raise ValueError(f"Unsupported type: {_type}")
 def run():
     # ===== init ====================================================
     args = parse_args()
-    fast_trace = args.fast_trace
-    using_pari = args.use_pari
     apply_config_from_args(args)
+    pari_info = " | Using PARI" if args.use_pari else ""
     N, p, n = args.N, args.p, args.n
     q = p**n
     start_t = time.time()
     # ================================================================
 
     # ===== Main Computation =========================================
+    gamma = Gamma(N, args.type)
+    XN = ModularCurve(gamma).over(p, n)
     Logger.cprint(
-        f"ARGS: Optimized trace enum: {fast_trace and args.type == 1}, Using PARI: {using_pari} | q mag={fmt_magnitude(q)}",
-        Colors.HEADER,
+        f"Begin Structure Report of {XN.info()} | q mag={fmt_magnitude(q)}{pari_info}",
+        Colors.NEON_PURPLE,
     )
-    XN = XN_over(args.type, N, p, n)
     # Count the number of rational points on Y1(N) including cusps
     cusp_fibers = []
 
     for fiber in XN.get_structure():
-        # set this to the minimum number of levels to probe
+        # set this to the minimum number of levels to probe, eg only display if num levels more than 3
         probe_len = -1
         if fiber.count == 0 or not any(
             len(record.levels) >= probe_len for record in fiber.eigen_records
         ):
             continue
-        fiber_data = f", D_K: {fiber.D_K}" if fiber.kind == "smooth" else ""
+        fiber_data = f", D_K: {fiber.D_K}, m0: {fiber.m0}" if fiber.kind == "smooth" else ""
+        clr = Colors.NEON_LIME if fiber.kind == "smooth" else Colors.NEON_PINK
         Logger.cprint(
-            f"{fiber.kind.capitalize()} fiber over t: {fiber.t}{fiber_data}, size: {fiber.count}",
-            Colors.YELLOW,
+            f"{fiber.kind.capitalize()} fiber of X{args.type}({N})(F_{p}^{n}) | t: {fiber.t}{fiber_data}, size: {fiber.count}",
+            clr,
         )
         for record in fiber.eigen_records:
             if args.type == 0:
                 Logger.cprint(
-                    f"Probe level count: {len(record.levels)}",
-                    Colors.CYAN,
+                    f"λ={record.eigenform.value}",
+                    Colors.NEON_PURPLE,
                 )
             Logger.print_results(
-                format_eigenform_data(fiber, record, q, N)
+                format_eigenform_data(fiber, record, q, gamma)
             )
             print()
 
     # ================================================================
-    # ===== Results ==================================================
-    # ================================================================
-
 
 # ===== args parsing ============================================
 def parse_args():
     return parse_example_args(
-        "Compute Fq rational Points on X1(N)", include_prime_range=True
+        "",
+        overrides={
+            "p": 13,
+            "n": 4,
+            "N": 12,
+        }
     )
 # ================================================================
 

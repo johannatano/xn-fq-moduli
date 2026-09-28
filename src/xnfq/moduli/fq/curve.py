@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from math import comb, gcd
+from math import comb, gcd, isqrt
 
 from ...arithmetic.forms import BinaryQuadraticForm
 from ...arithmetic.common import legendre
 from ..level_structures import LevelStructure
 from ..modular_curve import ModularCurve
 
-from ...config import get_pari
+from ...config import get_config, get_pari
 
 def _hK(DK: int) -> int:
     """Class number of the quadratic order with discriminant `DK`."""
-
     pari = get_pari()
     if pari:
         return int(pari.qfbclassno(DK))
@@ -29,46 +28,66 @@ def _d0(DK: int, p: int, t: int) -> int:
 
 
 class ModularCurveFq(ModularCurve):
-    """The `F_q`-rational point count of a level-N modular curve."""
-
     def __init__(self, level_structure: LevelStructure, p: int, n: int):
         super().__init__(level_structure)
         self.p, self.n, self.q = p, n, p**n
 
+
+
     def change_base(self, p: int, n: int) -> "ModularCurveFq":
-        """Rebuild the same level problem over a new finite field."""
         return type(self)(self.level_structure, p, n)
 
     def smooth_fibers(self):
-        """Yield the non-cuspidal Frobenius strata over `F_q`."""
         from .smooth_fibers import SmoothFiberFq, enum_weil_q
-        for t, tower, frob_data in enum_weil_q(self):
-            mass = Fraction(
-                _mK(tower.DK, self.p) * _d0(tower.DK, self.p, t), _uK(tower.DK)
-            )
-            if mass == 0:
-                continue
-            yield SmoothFiberFq(self.level_structure, t, tower, frob_data, mass)
+        config = get_config()
+        HB = 2 * isqrt(self.q)
+        fast_trace_enum = config.fast_trace and self.level_structure.type > 0
+        total_enum = HB // self.N
+
+        strata = enum_weil_q(self, fast_trace_enum)
+        with self._progress_ctx(total=len(strata), desc="smooth fibers") as _p:
+            for t, tower, frob_data in strata:
+                mass = Fraction(
+                    _mK(tower.DK, self.p) * _d0(tower.DK, self.p, t), _uK(tower.DK)
+                )
+                if mass == 0:
+                    try:
+                        _p.update(1)
+                    except Exception:
+                        pass
+                    continue
+                yield SmoothFiberFq(self.level_structure, t, tower, frob_data, mass)
+                try:
+                    _p.update(1)
+                except Exception:
+                    pass
 
     def cusps(self):
-        """Yield cusp fibers allowed by the level structure over `F_q`."""
         from .cusp_fibers import CuspFiberFq, enum_d_gons
-
-        for t, frob_data in enum_d_gons(self, self.level_structure.type):
-            yield CuspFiberFq(self.level_structure, t, frob_data)
+        strata = enum_d_gons(self, self.level_structure.type)
+        with self._progress_ctx(total=len(strata), desc="cusp fibers") as _p:
+            for t, frob_data in strata:
+                yield CuspFiberFq(self.level_structure, t, frob_data)
+                try:
+                    _p.update(1)
+                except Exception:
+                    pass
 
     def hk(self, t: int, q: int, k: int) -> int:
-        """Trace polynomial for the `k`th symmetric power at Frobenius trace `t`."""
+        """Complete homogeneous polynomial for the `k`th symmetric power at Frobenius trace `t`."""
         return sum(
             comb(k - j, j) * (-q) ** j * t ** (k - 2 * j) for j in range(k // 2 + 1)
         )
-
-    def tr_frob_symk(self, k: int) -> int:
-        """Compute the trace of Frobenius on the `k`th symmetric power."""
+    def tr_fq(self, k: int) -> int:
+        assert k >= 2, "tr_fq is only defined for k >= 2"
         val = 0
-        # TODO: not sure if this always holds?
-        if k == 0:
+        # TODO: double check eps0 for n > 1
+        if k == 2: # we recover internal k = 0
             val = self.q + (1 if gcd(self.q, self.N) == 1 else 0)
-        curves_term = sum(self.hk(c.t, self.q, k) * c.count() for c in self.smooth_fibers())
-        cusp_term = sum((c.t ** (k + 2)) * c.count() for c in self.cusps())
+        curves_term = sum(self.hk(c.t, self.q, k-2) * c.count() for c in self.smooth_fibers())
+        cusp_term = sum((c.t ** (k)) * c.count() for c in self.cusps())
         return val - curves_term - cusp_term
+
+    def info(self) -> str:
+        base = super().info()
+        return f"{base}(F_{self.p}^{self.n})"

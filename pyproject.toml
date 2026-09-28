@@ -29,6 +29,7 @@ examples = [
     "matplotlib>=3.8",
     "requests>=2.31",
     "sympy>=1.12",
+    "tqdm>=4.64",
 ]
 
 [tool.setuptools]

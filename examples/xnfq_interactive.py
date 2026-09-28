@@ -5,21 +5,13 @@ from fractions import Fraction
 import time
 
 from xnfq.config import apply_config_from_args
-from xnfq.moduli.modular_curve import X0, X1, X
+from xnfq.moduli import ModularCurve, Gamma
 from utils.args import parse_example_args
 from utils.fmt import fmt_magnitude
 from utils.ui.dashboard import Dashboard, Param
+from utils.logging import Logger, Colors
 
-def XN_over(_type: int, N: int, p: int, n: int):
-    if _type == 0:
-        return X0(N).over(p, n)
-    elif _type == 1:
-        return X1(N).over(p, n)
-    elif _type == 2:
-        return X(N).over(p, n)
-    else:
-        raise ValueError(f"Unsupported type: {_type}")
-
+MAX_Q = 1_000_000
 
 def curve_label(_type: int) -> str:
     return {0: "X_0", 1: "X_1", 2: "X"}[_type]
@@ -48,9 +40,9 @@ class XNFqPlotView(Dashboard):
 
     def params(self):
         return [
-            Param("p", 2, 97, 43, step=1, label="p", choices=PRIME_CHOICES),
-            Param("n", 1, 8, 1, step=1, label="n"),
-            Param("N", 1, 100, 3, step=1, label="N"),
+            Param("p", 2, 97, 5, step=1, label="p", choices=PRIME_CHOICES),
+            Param("n", 1, 8, 8, step=1, label="n"),
+            Param("N", 1, 100, 9, step=1, label="N"),
             Param("type", 0, 2, 1, step=1, label="Gamma"),
         ]
 
@@ -62,17 +54,44 @@ class XNFqPlotView(Dashboard):
         return f"{curve_label(self['type'])}({self['N']}) over F_{q} strata"
 
     def _snapshot(self):
-        key = (self["p"], self["n"], self["N"], self["type"])
+        # read current parameter values
+        p = self["p"]
+        n = self["n"]
+        N = self["N"]
+        _type = self["type"]
+        key = (p, n, N, _type)
         if getattr(self, "_cache_key", None) == key:
             return self._cache_data
 
-        p, n, N, _type = key
-        q = p**n
+        q = p ** n
 
-        if q > 1_000_000:
-            raise ValueError(f"q = {q} is too large")
+        if q > MAX_Q:
+            orig_n = n
+            # decrease n until q is manageable or n reaches 1
+            while n > 1 and p ** n > MAX_Q:
+                n -= 1
+            q = p ** n
+            if p ** orig_n > MAX_Q and n < orig_n:
+                print(f"q = {p**orig_n} is very large; using n={n} (q={q}) instead")
+                # update internal param and UI slider without triggering a full refresh
+                try:
+                    # Param.set enforces type/clamping
+                    self._params["n"].set(n)
+                    # sync widget text/value
+                    self._sync_widgets()
+                except Exception:
+                    pass
+                # update cache key to reflect new n
+                key = (p, n, N, _type)
+            elif q > MAX_Q:
+                # even n=1 is too large for this p
+                print(f"q = {q} is very large (p={p}, n=1); consider choosing a smaller p")
 
-        XN = XN_over(_type, N, p, n)
+        XN = ModularCurve(Gamma(N, _type)).over(p, n)
+        Logger.cprint(
+            f"Fetching {XN.info()} | q mag={fmt_magnitude(q)}",
+            Colors.NEON_PURPLE,
+        )
         report = XN.get_structure()
         smooth_weight = XN.level_structure.weight(smooth=True)
         cusp_weight = XN.level_structure.weight(smooth=False)
@@ -198,6 +217,12 @@ class XNFqPlotView(Dashboard):
 def run() -> None:
     args = parse_args()
     apply_config_from_args(args)
+    # allow overriding MAX_Q from the CLI
+    global MAX_Q
+    try:
+        MAX_Q = int(getattr(args, "max_q", MAX_Q))
+    except Exception:
+        pass
     overrides = {}
     for name in ("p", "n", "N", "type"):
         value = getattr(args, name)
@@ -208,7 +233,7 @@ def run() -> None:
 # ===== args parsing ============================================
 def parse_args():
     args = parse_example_args(
-        "Compute Fq rational Points on X1(N)", include_prime_range=True
+        "", include_prime_range=True
     )
     options = set(sys.argv[1:])
     if not {"-p", "--p"} & options:
@@ -219,6 +244,18 @@ def parse_args():
         args.N = None
     if "-type" not in options and "--type" not in options:
         args.type = None
+    # parse optional --max-q or --maxq value from argv
+    max_q = None
+    for flag in ("--max-q", "--maxq"):
+        if flag in sys.argv:
+            try:
+                idx = sys.argv.index(flag)
+                val = sys.argv[idx + 1]
+                max_q = int(val)
+            except Exception:
+                max_q = None
+            break
+    args.max_q = max_q
     return args
 # ================================================================
 

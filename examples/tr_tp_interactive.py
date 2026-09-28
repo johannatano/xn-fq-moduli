@@ -6,28 +6,24 @@ import time
 from sympy import primerange
 
 from xnfq.config import apply_config_from_args
-from xnfq.moduli.modular_curve import X, X0, X1
+from xnfq.moduli import ModularCurve, Gamma
 from utils.args import parse_example_args
+from utils.logging import Logger, Colors
+
 from utils.ui.dashboard import Dashboard, Param
 
+
 def XN_over(level_type: int, N: int, p: int):
-    if level_type == 0:
-        return X0(N).over(p, 1)
-    if level_type == 1:
-        return X1(N).over(p, 1)
-    if level_type == 2:
-        return X(N).over(p, 1)
-    raise ValueError(f"Unsupported type: {level_type}")
+    return ModularCurve(Gamma(N, level_type)).over(p, 1)
 
 
-def curve_label(level_type: int) -> str:
-    return {0: "X_0", 1: "X_1", 2: "X"}[level_type]
+class HeckeTraceInteractive(Dashboard):
+    """Interactive dashboard for Tr(F_p) (symmetric powers) as p varies.
 
+    This view mirrors the previous `tr_tp_range` dashboard but uses the
+    `tr_fq` computation for the curves over F_p (n=1)."""
 
-class HeckeTracePlotView(Dashboard):
-    """Plot the symmetric-power Frobenius trace as the prime varies."""
-
-    title = "Hecke Trace"
+    title = "Hecke Trace (interactive)"
     figsize = (11.0, 6.5)
     use_text_inputs = True
     prime_step = 1000
@@ -52,10 +48,7 @@ class HeckeTracePlotView(Dashboard):
         return ["trace"]
 
     def actions(self):
-        return {
-            "<< prev": self.previous_window,
-            "next >>": self.next_window,
-        }
+        return {"<< prev": self.previous_window, "next >>": self.next_window}
 
     def primes(self) -> list[int]:
         return list(primerange(self.pmin, self.pmax + 1))
@@ -74,13 +67,7 @@ class HeckeTracePlotView(Dashboard):
         self._cache_key = None
 
     def _snapshot(self):
-        key = (
-            self["N"],
-            self["k"],
-            self["type"],
-            self.pmin,
-            self.pmax,
-        )
+        key = (self["N"], self["k"], self["type"], self.pmin, self.pmax)
         if getattr(self, "_cache_key", None) == key:
             return self._cache_data
 
@@ -89,9 +76,14 @@ class HeckeTracePlotView(Dashboard):
         started = time.perf_counter()
         traces: list[tuple[int, float]] = []
 
+        Logger.cprint(
+            f"Tr(T_p, S[Gamma{level_type}({N}), k={k})) (p range {pmin}-{pmax})",
+            Colors.NEON_PURPLE,
+        )
+
         for p in primes:
             curve = XN_over(level_type, N, p)
-            norm = curve.tr_frob_symk(k) / p ** ((k + 1) / 2)
+            norm = curve.tr_fq(k) / p ** ((k - 1) / 2)
             traces.append((p, norm))
 
         self._cache_key = key
@@ -110,24 +102,16 @@ class HeckeTracePlotView(Dashboard):
         snapshot = self._snapshot()
         N = snapshot["N"]
         k = snapshot["k"]
-        level_type = snapshot["type"]
         pmin = snapshot["pmin"]
         pmax = snapshot["pmax"]
         traces = snapshot["traces"]
-        label = curve_label(level_type)
 
-        ax.set_title(f"Tr(T_p | S_{k+2}({N}))")
+        ax.set_title(f"Tr(T_p | S_{k}({N}))")
 
         if traces:
             primes = [p for p, _ in traces]
             values = [float(trace) for _, trace in traces]
-            ax.plot(
-                primes,
-                values,
-                markersize=1,
-                linewidth=1.0,
-                color="black",
-            )
+            ax.plot(primes, values, markersize=1, linewidth=1.0, color="black")
             ax.set_xlim(pmin, pmax)
             y_min = min(values)
             y_max = max(values)
@@ -143,35 +127,17 @@ class HeckeTracePlotView(Dashboard):
         ax.tick_params(axis="y", labelleft=False)
         ax.set_ylabel("a_p normalized")
         ax.grid(color="grey", linewidth=.5)
-        
+
 
 def run() -> None:
-    args = parse_args()
+    args = parse_example_args("Hecke Trace (interactive)", include_weight=True)
     apply_config_from_args(args)
-    overrides = {
-        "pmin": args.p,
-        "pmax": args.p + HeckeTracePlotView.prime_window_size - 1,
-    }
+    overrides = {"pmin": args.p, "pmax": args.p + HeckeTraceInteractive.prime_window_size - 1}
     for name in ("N", "k", "type"):
         value = getattr(args, name)
         if value is not None:
             overrides[name] = value
-    HeckeTracePlotView(**overrides).show()
-
-
-def parse_args():
-    args = parse_example_args(
-        "Hecke Trace",
-        include_sym_power=True,
-    )
-    options = set(sys.argv[1:])
-    if not {"-N", "--N"} & options:
-        args.N = None
-    if not {"-type", "--type"} & options:
-        args.type = None
-    if "-k" not in options:
-        args.k = None
-    return args
+    HeckeTraceInteractive(**overrides).show()
 
 
 if __name__ == "__main__":

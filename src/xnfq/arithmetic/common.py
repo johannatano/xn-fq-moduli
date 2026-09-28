@@ -39,8 +39,6 @@ def factorize(n):
             (int(prime), int(exponent))
             for prime, exponent in pari.factorint(n).python()
         ]
-        #from sympy import factorint
-        #return list(factorint(n).items())
     factors = []
     d = 2
     while d * d <= n:

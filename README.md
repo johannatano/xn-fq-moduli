@@ -32,6 +32,7 @@ python -m pip install -e ".[examples]"
 The library is intentionally built with no required external dependencies. However, class-number computations can be expensive for large ranges (e.g. q &gt; 10^5). We strongly recommend downloading a precomputed class-number database or build locally using PARI if available.
 
 #### 02.1.1 Download
+From the repository root
 ```bash
 python scripts/get_classnb_db.py --url "https://github.com/johannatano/xn-fq-moduli/releases/download/classnb-max_d=10.7/classnb.db" --force
 ```

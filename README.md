@@ -44,7 +44,7 @@ Pass `--use-pari` to use `pari.qfbclassno(DK)` (requires the `cypari2` package);
 
 ## 03. Documentation
 ### 3.1 Level Structure
-For determining the structures of given level type, we use a universal model for a generic congruence subgroup and use type index to specialize further restrictions
+We use a universal model for a generic congruence subgroup which specializes to incremental restrictions following type index
 ```python
 from xnfq.moduli import Gamma0, Gamma1, Gamma2, Gamma
 N = 11
@@ -58,7 +58,7 @@ gamma = Gamma(N, type=1)  # returns Gamma1(N)
 gamma = Gamma(N)          # returns Gamma2(N)
 ```
 ### 3.2 Modular Curve
-The main modular curve object is constructed as a generic moduli problem, and then specialized to given finite field
+The main modular curve object is constructed as a generic moduli problem, further specialized to given finite field
 ```python
 from xnfq.moduli.level_structures import Gamma
 from xnfq.moduli.modular_curve import X, X0, X1

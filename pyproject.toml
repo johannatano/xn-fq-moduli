@@ -24,7 +24,6 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-pari = ["cypari2"]
 examples = [
     "matplotlib>=3.8",
     "requests>=2.31",
@@ -38,3 +37,6 @@ include-package-data = false
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["xnfq*"]
+
+[project.scripts]
+xnfq-get-classnb-db = "xnfq.cli:main"

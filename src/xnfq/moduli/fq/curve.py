@@ -5,20 +5,15 @@ from math import comb, gcd, isqrt
 
 from ...arithmetic.forms import BinaryQuadraticForm
 from ...arithmetic.common import legendre
+from ...arithmetic.quadratic import cln
 from ..level_structures import LevelStructure
 from ..modular_curve import ModularCurve
 from .data import TrFqTraceRecord
 from ...config import get_config, get_pari
 
-def _hK(DK: int) -> int:
-    """Class number of the quadratic order with discriminant `DK`."""
-    pari = get_pari()
-    if pari:
-        return int(pari.qfbclassno(DK))
-    return BinaryQuadraticForm.h(DK)
 
 def _mK(DK: int, p: int) -> Fraction:
-    return _hK(DK) if DK != 0 else (p - 1)
+    return cln(DK) if DK != 0 else (p - 1)
 
 def _uK(DK: int) -> Fraction:
     return 2 * (2 if DK == -4 else 3 if DK == -3 else 12 if DK == 0 else 1)

@@ -8,7 +8,19 @@ from .forms import BinaryQuadraticForm
 from .common import factorize, legendre, valuation as vl
 from .function import KroneckerCharacter, phi
 from ..config import get_pari
+from ..store.db import query_classnb
 
+def cln(DK: int) -> int:
+    """Class number of the quadratic order with discriminant `DK`."""
+    # Prefer a precomputed DB entry when available (user-downloadable optional DB).
+    h = query_classnb(DK)
+    if h is not None:
+        return h
+
+    pari = get_pari()
+    if pari:
+        return int(pari.qfbclassno(DK))
+    return BinaryQuadraticForm.h(DK)
 
 class QuadraticNumberField(NumberField):
     def __init__(self, d: int):

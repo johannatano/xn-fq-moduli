@@ -27,16 +27,20 @@ From the repository root
 ```bash
 python -m pip install -e ".[examples]"
 ```
-Optional PARI support for faster computations over large $q$ can be installed with
 
-```bash
-python -m pip install -e ".[pari]"
-```
-pass `--use-pari` to any example for optimized integer factorization and class number computations
+### 02.1 Classnumber DB
+The library is intentionally built with no required external dependencies. However, class-number computations can be expensive for large ranges (e.g. q &gt; 10^5). We strongly recommend downloading a precomputed class-number database or build locally using PARI if available.
 
+#### 02.1.1 Download
 ```bash
-python examples/xnfq_count.py --use-pari
+python scripts/get_classnb_db.py --url "https://github.com/johannatano/xn-fq-moduli/releases/download/classnb-max_d=10.7/classnb.db" --force
 ```
+Saves to `src/xnfq/store/classnb.db`. The library will automatically perform lookups over computation.
+#### 02.1.2 Build locally
+```bash
+python scripts/build_db.py --max-d <N>
+```
+Pass `--use-pari` to use `pari.qfbclassno(DK)` (requires the `cypari2` package); otherwise the script falls back to library native enumeration of principal reduced forms via `BinaryQuadraticForm.h(DK)` in `xnfq.arithmetic.forms`.
 
 ## 03. Documentation
 ### 3.1 Level Structure
@@ -200,8 +204,8 @@ Common CLI arguments
 -n <int>      # extension degree n (so q = p**n)
 -k <int>      # weight k (integer >= 2)
 --type <0|1|2> # Gamma type (0,1,2)
---use-pari     # enable optional PARI acceleration
---sage         # run a Sage comparison when supported
+--use-pari     # enable optional PARI acceleration for integer factorization (requires cypari2)
+--sage         # run a Sage comparison when supported (trace computations) (requires sage)
 --help         # show script-specific options
 ```
 
@@ -222,8 +226,7 @@ Common CLI arguments
 ![Hecke trace](Figure_2.png)
 
 
-## 05. TODO
-- Add precomputed class numbers database.
+## 05. TODO / Future work
 - Implement automatic LMBFD API verification instead of Sage
 - Probe individual lattice structures $(N, \pi-\lambda)$ to recover isogeny graphs.
 - Implement Quaternion Lattice forms (for supersingular graph structure)

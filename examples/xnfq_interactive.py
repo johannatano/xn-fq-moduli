@@ -11,11 +11,9 @@ from utils.fmt import fmt_magnitude
 from utils.ui.dashboard import Dashboard, Param
 from utils.logging import Logger, Colors
 
-MAX_Q = 1_000_000
 
 def curve_label(_type: int) -> str:
-    return {0: "X_0", 1: "X_1", 2: "X"}[_type]
-
+    return {0: "$X_0$", 1: "$X_1$", 2: "$X$"}[_type]
 
 def _prime_choices(stop: int) -> list[int]:
     primes: list[int] = []
@@ -33,25 +31,47 @@ def _prime_choices(stop: int) -> list[int]:
 
 
 PRIME_CHOICES = _prime_choices(97)
-
+MAX_Q = 10_000_000 # gate to automatically lower n if we are above to prevent hangups
 
 class XNFqPlotView(Dashboard):
-    figsize = (14.0, 6.5)
+    figsize = (8.0, 3.0)
+    use_text_inputs = True
+    def __init__(self, *, p: int = 5, n: int = 8, N: int = 9, type: int = 1):
+        self.initial_p = int(p)
+        self.initial_n = int(n)
+        self.initial_N = int(N)
+        self.initial_type = int(type)
+        super().__init__()
 
     def params(self):
-        return [
-            Param("p", 2, 97, 5, step=1, label="p", choices=PRIME_CHOICES),
-            Param("n", 1, 8, 8, step=1, label="n"),
-            Param("N", 1, 100, 9, step=1, label="N"),
-            Param("type", 0, 2, 1, step=1, label="Gamma"),
-        ]
+        params = []
+        if self.initial_p in PRIME_CHOICES:
+            params.append(Param("p", 2, 97, self.initial_p, step=1, label="p", choices=PRIME_CHOICES))
+        else:
+            params.append(Param("p", 2, max(self.initial_p, 97), self.initial_p, step=1, label="p"))
+
+        params.append(Param("n", 1, max(8, self.initial_n), self.initial_n, step=1, label="n"))
+        params.append(Param("N", 1, max(100, self.initial_N), self.initial_N, step=1, label="level"))
+        params.append(Param("type", 0, 2, self.initial_type, step=1, label=r"$\Gamma$"))
+        return params
 
     def panels(self):
         return ["smooth", "cusps"]
 
     def header(self) -> str:
-        q = self["p"] ** self["n"]
-        return f"{curve_label(self['type'])}({self['N']}) over F_{q} strata"
+        curve = curve_label(self['type']).strip('$')
+        p = self['p']
+        n = self['n']
+        N = self['N']
+        return "$" + curve + "(" + str(N) + ")\\ \\mathrm{over}\\ \\mathbb{F}_{" + str(p) + "^{" + str(n) + "}}\\ \\mathrm{strata}$"
+
+    def build(self, interactive: bool = True):
+        fig = super().build(interactive=interactive)
+        try:
+            fig.subplots_adjust(top=0.82, bottom=0.08)
+        except Exception:
+            pass
+        return fig
 
     def _snapshot(self):
         # read current parameter values
@@ -73,18 +93,13 @@ class XNFqPlotView(Dashboard):
             q = p ** n
             if p ** orig_n > MAX_Q and n < orig_n:
                 print(f"q = {p**orig_n} is very large; using n={n} (q={q}) instead")
-                # update internal param and UI slider without triggering a full refresh
                 try:
-                    # Param.set enforces type/clamping
                     self._params["n"].set(n)
-                    # sync widget text/value
                     self._sync_widgets()
                 except Exception:
                     pass
-                # update cache key to reflect new n
                 key = (p, n, N, _type)
             elif q > MAX_Q:
-                # even n=1 is too large for this p
                 print(f"q = {q} is very large (p={p}, n=1); consider choosing a smaller p")
 
         XN = ModularCurve(Gamma(N, _type)).over(p, n)
@@ -156,7 +171,7 @@ class XNFqPlotView(Dashboard):
                 y_values = [float(total) for _, total in smooth_by_dk]
                 # ax.scatter(x_values, y_values, s=24, color="black", alpha=1)
                 ax.vlines(
-                    x_values, 0.0, y_values, color="black", alpha=.5, linewidth=1.5
+                    x_values, 0.0, y_values, color="black", alpha=1.0, linewidth=1.5
                 )
                 ax.set_xscale("symlog", linthresh=1, base=10)
                 ax.set_xlim(min(x_values) - 1, max(x_values) + 1)
@@ -166,12 +181,13 @@ class XNFqPlotView(Dashboard):
                 ax.text(0.5, 0.5, "no smooth fibers", ha="center", va="center")
 
             ax.set_title(f"Smooth Fibers")
-            ax.set_xlabel("D_K")
+            ax.set_xlabel("$D_K$")
             ax.tick_params(axis="y", left=False, labelleft=False)
-            ax.grid(color="0.92", linewidth=0.8)
+            ax.grid(color="grey", linewidth=.5)
+            
 
             summary = (
-                f"total count={yn_count}"
+                f"total={yn_count}"
             )
             ax.text(
                 0.98,
@@ -188,7 +204,7 @@ class XNFqPlotView(Dashboard):
             x_values = [d for d, _ in cusp_by_d]
             y_values = [float(total) for _, total in cusp_by_d]
             # ax.scatter(x_values, y_values, s=32, color="black", alpha=1)
-            ax.vlines(x_values, 0.0, y_values, color="black", alpha=.5, linewidth=1.5)
+            ax.vlines(x_values, 0.0, y_values, color="black", alpha=1.0, linewidth=1.5)
             ax.set_xticks(x_values)
             ax.set_xlim(min(x_values) - 1, max(x_values) + 1)
             y_max = max(y_values, default=0.0)
@@ -199,9 +215,10 @@ class XNFqPlotView(Dashboard):
         ax.set_title(f"Cusp Fibers")
         ax.set_xlabel("d")
         ax.tick_params(axis="y", left=False, labelleft=False)
-        ax.grid(color="0.92", linewidth=0.8)
+        ax.grid(color="grey", linewidth=.5)
+        
         summary = (
-            f"total count={cusp_count}"
+            f"total={cusp_count}"
         )
         ax.text(
             0.98,
@@ -215,49 +232,23 @@ class XNFqPlotView(Dashboard):
 
 
 def run() -> None:
-    args = parse_args()
-    apply_config_from_args(args)
-    # allow overriding MAX_Q from the CLI
-    global MAX_Q
-    try:
-        MAX_Q = int(getattr(args, "max_q", MAX_Q))
-    except Exception:
-        pass
-    overrides = {}
-    for name in ("p", "n", "N", "type"):
-        value = getattr(args, name)
-        if value is not None:
-            overrides[name] = value
-    XNFqPlotView(**overrides).show()
-
-# ===== args parsing ============================================
-def parse_args():
     args = parse_example_args(
-        "", include_prime_range=True
+        "",
+        include_prime_range=True,
+        overrides={
+            "p": 5,
+            "n": 8,
+            "N": 16,
+            "type": 1,
+        },
     )
-    options = set(sys.argv[1:])
-    if not {"-p", "--p"} & options:
-        args.p = None
-    if "-n" not in options and "--n" not in options:
-        args.n = None
-    if "-N" not in options and "--N" not in options:
-        args.N = None
-    if "-type" not in options and "--type" not in options:
-        args.type = None
-    # parse optional --max-q or --maxq value from argv
-    max_q = None
-    for flag in ("--max-q", "--maxq"):
-        if flag in sys.argv:
-            try:
-                idx = sys.argv.index(flag)
-                val = sys.argv[idx + 1]
-                max_q = int(val)
-            except Exception:
-                max_q = None
-            break
-    args.max_q = max_q
-    return args
-# ================================================================
+    apply_config_from_args(args)
+    XNFqPlotView(
+        p=args.p,
+        n=args.n,
+        N=args.N,
+        type=args.type,
+    ).show()
 
 if __name__ == "__main__":
     run()

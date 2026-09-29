@@ -49,6 +49,8 @@ class Dashboard(ABC):
     control_gap: float = 0.08
     use_text_inputs: bool = False
     text_input_names: set[str] = set()
+    # desired pixel height for text input boxes (can be overridden per-view)
+    text_input_height_px: int = 50
 
     def __init__(self, **overrides) -> None:
         self._params: dict[str, Param] = {p.name: p for p in self.params()}
@@ -136,7 +138,7 @@ class Dashboard(ABC):
     def build(self, interactive: bool = True):
         import matplotlib.pyplot as plt
 
-        self._fig = plt.figure(figsize=self.figsize)
+        self._fig = plt.figure(figsize=self.figsize, dpi=300)
         names = list(self.panels())
 
         has_widgets = interactive and self._has_widgets()
@@ -168,7 +170,7 @@ class Dashboard(ABC):
             self._live = False
         return self._fig
 
-    def save(self, path: str, dpi: int = 150):
+    def save(self, path: str, dpi: int = 300):
         import matplotlib
 
         matplotlib.use("Agg")
@@ -193,11 +195,29 @@ class Dashboard(ABC):
         from matplotlib.widgets import Button, Slider, TextBox
 
         left = 1.0 - self.control_width
-        width = self.control_width - 0.04
-        height, gap = 0.035, 0.018
+        # Reserve a small pad to the right of each slider for the value text
+        slider_value_pad = 0.06
+        # Shrink the slider axis width so the value can sit to its right
+        width = self.control_width - 0.04 - slider_value_pad
+        if width < 0.04:
+            width = max(0.04, self.control_width - 0.04 - 0.02)
+        base_height, gap = 0.035, 0.018
         top = 0.88
 
+        # Compute a nicer height for text input boxes in figure fractions.
+        fig = self._fig
+        fig_pixel_height = fig.get_size_inches()[1] * fig.dpi if fig is not None else 900
+        # target pixel height for text inputs (matches HeckeTraceInteractive look)
+        text_input_height_px = getattr(self, "text_input_height_px", self.text_input_height_px)
+        text_input_height_frac = text_input_height_px / fig_pixel_height
+
         for p in self._slider_params():
+            # choose per-widget height: larger for text inputs, base for sliders
+            if self.use_text_inputs or p.name in self.text_input_names:
+                height = max(base_height, text_input_height_frac)
+            else:
+                height = base_height
+
             ax = self._fig.add_axes([left, top, width, height])
             if self.use_text_inputs or p.name in self.text_input_names:
                 textbox = TextBox(ax, "", initial=p.format_value())
@@ -214,6 +234,17 @@ class Dashboard(ABC):
                     dragging=False,
                 )
                 slider.valtext.set_text(p.format_value())
+                # Move the value text outside the slider axis to the right
+                try:
+                    fig = self._fig
+                    valx = left + width + 0.02
+                    valy = top + height / 2.0
+                    slider.valtext.set_transform(fig.transFigure)
+                    slider.valtext.set_position((valx, valy))
+                    slider.valtext.set_ha("left")
+                    slider.valtext.set_va("center")
+                except Exception:
+                    pass
                 slider.on_changed(self._slider_callback(p.name))
                 self._widgets[p.name] = slider
             ax.text(

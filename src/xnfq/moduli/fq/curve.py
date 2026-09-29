@@ -7,7 +7,7 @@ from ...arithmetic.forms import BinaryQuadraticForm
 from ...arithmetic.common import legendre
 from ..level_structures import LevelStructure
 from ..modular_curve import ModularCurve
-
+from .data import TrFqTraceRecord
 from ...config import get_config, get_pari
 
 def _hK(DK: int) -> int:
@@ -31,8 +31,6 @@ class ModularCurveFq(ModularCurve):
     def __init__(self, level_structure: LevelStructure, p: int, n: int):
         super().__init__(level_structure)
         self.p, self.n, self.q = p, n, p**n
-
-
 
     def change_base(self, p: int, n: int) -> "ModularCurveFq":
         return type(self)(self.level_structure, p, n)
@@ -78,15 +76,21 @@ class ModularCurveFq(ModularCurve):
         return sum(
             comb(k - j, j) * (-q) ** j * t ** (k - 2 * j) for j in range(k // 2 + 1)
         )
-    def tr_fq(self, k: int) -> int:
+    def tr_fq(self, k: int) -> TrFqTraceRecord:
         assert k >= 2, "tr_fq is only defined for k >= 2"
-        val = 0
+        eps0 = 0
         # TODO: double check eps0 for n > 1
         if k == 2: # we recover internal k = 0
-            val = self.q + (1 if gcd(self.q, self.N) == 1 else 0)
+            eps0 = self.q + (1 if gcd(self.q, self.N) == 1 else 0)
         curves_term = sum(self.hk(c.t, self.q, k-2) * c.count() for c in self.smooth_fibers())
         cusp_term = sum((c.t ** (k)) * c.count() for c in self.cusps())
-        return val - curves_term - cusp_term
+        
+        return TrFqTraceRecord(
+            val=eps0 - curves_term - cusp_term,
+            smooth=curves_term,
+            cusp=cusp_term,
+            eps0=eps0,
+        )
 
     def info(self) -> str:
         base = super().info()

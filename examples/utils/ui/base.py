@@ -45,12 +45,20 @@ class Param:
 	def set(self, value):
 		"""Coerce to the declared type and clamp into range."""
 		if self.choices is not None:
-			if value not in self.choices:
+			# Accept string inputs from text widgets by coercing to the declared type
+			try:
+				value_cast = value if isinstance(value, self.type) else self.type(value)
+			except Exception:
 				raise ValueError(
 					f"invalid value {value!r} for {self.name!r}; "
+					f"could not convert to {self.type.__name__}"
+				)
+			if value_cast not in self.choices:
+				raise ValueError(
+					f"invalid value {value_cast!r} for {self.name!r}; "
 					f"expected one of {list(self.choices)!r}"
 				)
-			self.value = value
+			self.value = value_cast
 			return self.value
 		value = self.type(value)
 		if isinstance(value, (int, float)) and not isinstance(value, bool):

@@ -18,30 +18,28 @@ def XN_over(level_type: int, N: int, p: int):
 
 
 class HeckeTraceInteractive(Dashboard):
-    """Interactive dashboard for Tr(F_p) (symmetric powers) as p varies.
-
-    This view mirrors the previous `tr_tp_range` dashboard but uses the
-    `tr_fq` computation for the curves over F_p (n=1)."""
-
-    title = "Hecke Trace (interactive)"
-    figsize = (11.0, 6.5)
+    title = ""
+    figsize = (8.0, 4.75)
     use_text_inputs = True
-    prime_step = 1000
-    prime_window_size = 1000
+    prime_step = 5000
+    prime_window_size = 5000
 
-    def __init__(self, **overrides):
-        self.pmin = max(2, int(overrides.pop("pmin", 2)))
+    def __init__(self, *, N: int = 100, k: int = 2, type: int = 1, pmin: int = 2, pmax: int | None = None):
+        self.initial_N = int(N)
+        self.initial_k = int(k)
+        self.initial_type = int(type)
+        self.pmin = max(2, int(pmin))
         self.pmax = max(
             self.pmin,
-            int(overrides.pop("pmax", self.pmin + self.prime_window_size - 1)),
+            int(pmax if pmax is not None else self.pmin + self.prime_window_size - 1),
         )
-        super().__init__(**overrides)
+        super().__init__()
 
     def params(self):
         return [
-            Param("N", 1, 10_000, 100, step=1, label="N"),
-            Param("k", 0, 10_000, 2, step=1, label="k"),
-            Param("type", 0, 2, 1, step=1, label="Gamma"),
+            Param("N", 1, 10_000, self.initial_N, step=1, label="level"),
+            Param("k", 2, 10_000, self.initial_k, step=1, label="weight"),
+            Param("type", 0, 2, self.initial_type, step=1, label=r"$\Gamma$"),
         ]
 
     def panels(self):
@@ -77,13 +75,14 @@ class HeckeTraceInteractive(Dashboard):
         traces: list[tuple[int, float]] = []
 
         Logger.cprint(
-            f"Tr(T_p, S[Gamma{level_type}({N}), k={k})) (p range {pmin}-{pmax})",
+            f"Tr(T_p, S[Gamma{level_type}({N}), k={k}]) (p range {pmin}-{pmax})",
             Colors.NEON_PURPLE,
         )
 
         for p in primes:
             curve = XN_over(level_type, N, p)
-            norm = curve.tr_fq(k) / p ** ((k - 1) / 2)
+            val = curve.tr_fq(k).val
+            norm = val / p ** ((k - 1) / 2)
             traces.append((p, norm))
 
         self._cache_key = key
@@ -106,12 +105,15 @@ class HeckeTraceInteractive(Dashboard):
         pmax = snapshot["pmax"]
         traces = snapshot["traces"]
 
-        ax.set_title(f"Tr(T_p | S_{k}({N}))")
+        ax.set_title(
+            rf"$\mathrm{{Tr}}(T_p \mid S_{{{k}}}(\Gamma_{{{snapshot['type']}}}({N})))$"
+        )
 
         if traces:
             primes = [p for p, _ in traces]
             values = [float(trace) for _, trace in traces]
-            ax.plot(primes, values, markersize=1, linewidth=1.0, color="black")
+            ax.scatter(primes, values, s=4, color="black", marker="o")  # scatter
+            # ax.plot(primes, values, markersize=1, linewidth=1.0, color="black")  # line
             ax.set_xlim(pmin, pmax)
             y_min = min(values)
             y_max = max(values)
@@ -125,19 +127,28 @@ class HeckeTraceInteractive(Dashboard):
 
         ax.set_xlabel("p")
         ax.tick_params(axis="y", labelleft=False)
-        ax.set_ylabel("a_p normalized")
+        ax.set_ylabel("$a_p$ normalized")
         ax.grid(color="grey", linewidth=.5)
 
 
 def run() -> None:
-    args = parse_example_args("Hecke Trace (interactive)", include_weight=True)
+    args = parse_example_args(
+        "",
+        include_weight=True,
+        overrides={
+            "p": 50000,
+            "k": 4,
+            "N": 1000,
+        },
+    )
     apply_config_from_args(args)
-    overrides = {"pmin": args.p, "pmax": args.p + HeckeTraceInteractive.prime_window_size - 1}
-    for name in ("N", "k", "type"):
-        value = getattr(args, name)
-        if value is not None:
-            overrides[name] = value
-    HeckeTraceInteractive(**overrides).show()
+    HeckeTraceInteractive(
+        N=args.N,
+        k=args.k,
+        type=args.type,
+        pmin=args.p,
+        pmax=args.p + HeckeTraceInteractive.prime_window_size - 1,
+    ).show()
 
 
 if __name__ == "__main__":

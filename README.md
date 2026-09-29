@@ -10,31 +10,29 @@ Python software for counting points and studying the structure of modular curves
 - [05. TODO](#05-todo)
 
 ## 01. Overview
-We study $\mathbb F_q$-rational points $(E,\gamma)$ on modular curves, where $E$ is a generalized elliptic curve and $\gamma$ is a level-$N$ structure of unspecified type. By sending each point
+The main goal of this project is to study $\mathbb F_q$-rational points $(E,\gamma)$ on modular curves, where $E$ is a generalized elliptic curve and $\gamma$ is a level $N$ structure of unspecified type. By sending
 ```math
-(E,\gamma)\;\mapsto\;E\;\mapsto\;t, \qquad t = a_p(E)
+(E,\gamma)\;\mapsto\;E\;\mapsto\;(t, i), \qquad t = a_p(E)
 ```
-we naturally stratify the point count by $t$ allowing efficient computation of traces of modular forms.
+each point tuple becomes a fiber over $t$ with local index $i$ (determining the level structure) allowing naturally stratification over Frobenius trace $t$ and hence enables efficient computation of traces of modular forms.
 
 The fibers $\gamma$ over a fixed $E$ fall into two primary types — smooth fibers and cusp fibers. Over $\overline{\mathbb F}_q$ smooth fibers are modelled by level structures on $\mathbb Z/N\mathbb Z\times\mathbb Z/N\mathbb Z$, while cusp fibers are modelled via Néron $d$-gons $\mathbb F_q^{\times}\times\mathbb Z/d\mathbb Z$.
 
 The $\mathbb F_q$-rational points in a fiber correspond to Frobenius-stable eigenforms, determined by admissible eigenvalues $\lambda$ depending on the chosen level structure type. For a smooth fiber the eigenform is modelled by the binary quadratic form $(1,t,q)$ shifted by $-\lambda$, giving the algebraic integer $\pi-\lambda$ which satisfies
-$N\mid\mathrm{Norm}(\pi-\lambda)$. (When $\pi\in\mathbb Z$ this degenerates to an integral lattice in $\mathbb Z^2$). Cuspidal fibers are described by congruence conditions on Néron polygons.
+$N\mid\mathrm{Norm}(\pi-\lambda)$. (When $\pi\in\mathbb Z$ this degenerates to an integral model in $\mathbb Z^2$). Cuspidal fibers are described by congruence conditions on Néron polygons.
 
 
 ## 02. Installation
-From the repository root:
+From the repository root
 ```bash
 python -m pip install -e ".[examples]"
 ```
-The optional PARI support can be installed with:
+Optional PARI support for faster computations over large $q$ can be installed with
 
 ```bash
 python -m pip install -e ".[pari]"
 ```
-PARI **significantly** speeds up computations for large $q$. The project does not
-yet use a cached database for class numbers (TODO). After installing the optional
-PARI support, pass `--use-pari` to an example:
+when PARI support is enabled, pass `--use-pari` to any example and integer factorization and class number computations is routed via PARI
 
 ```bash
 python examples/xnfq_count.py --use-pari
@@ -42,20 +40,22 @@ python examples/xnfq_count.py --use-pari
 
 ## 03. Documentation
 ### 3.1 Level Structure
+For determining the structures of given level type, we use a universal model for a generic congruence subgroup and use type index to specialize further restrictions
 ```python
 from xnfq.moduli import Gamma0, Gamma1, Gamma2, Gamma
 N = 11
-# Gamma0: subgroup of upper-triangular/cyclic N-torsion (not scalar-only)
+# Gamma0: subgroup of upper-triangular matrix of any eigenvalue
 Gamma0(N)
-# Gamma1: choice of a point of exact order N (stabilizer subgroup, not scalar-only)
+# Gamma1: subgroup of upper-triangular matrix of eigenvalue 1
 Gamma1(N)
-# Gamma2: full N-torsion basis; marked as scalar-only in the code
+# Gamma2: subgroup of scalar matrix eigenvalue 1
 Gamma2(N)
 # convenience factory
 gamma = Gamma(N, type=1)  # returns Gamma1(N)
 gamma = Gamma(N)          # defaults to full level (Gamma2)
 ```
 ### 3.2 Modular Curve
+The main modular curve object is constructed as a generic moduli problem, and then specialized to given finite field
 ```python
 from xnfq.moduli.level_structures import Gamma
 from xnfq.moduli.modular_curve import X, X0, X1
@@ -76,6 +76,7 @@ X(N) # ModularCurve(Gamma(N, type=2))
 
 ```
 ### 3.3 Methods
+The library exposes three primary entry points. For lower-level or advanced workflows, most project specific fucntionality can be found in `xnfq.moduli.fq.curve`, `xnfq.moduli.fq.smooth_fibers`, and `xnfq.moduli.fq.cusp_fibers`.
 #### 3.3.1 Count
 The count method returns the total number of $\mathbb{F}_q$-rational points over each fiber type. 
 ```python
@@ -126,13 +127,11 @@ FiberRecordFq
                     │          OK basis
                     └── order: imaginary quadratic order
 ```
-#### 3.3.2.1 Example : Smooth fiber of $X_0(12)(\mathbb{F}_{13^4})$ | $t=322$, $D_K=-660$, size: 72
+#### 3.3.2.1 Example : Structure Report
 ```bash
 python examples/xnfq_structure.py -p 13 -n 4 -N 12 --type 0
 ```
-outputs
-
-Smooth fiber of $X_0(12)(\mathbb{F}_{13^4})$ | $t=322$, $D_K=-660$, $m_0=4$, size: 72
+prints a table per eigenform (grouped by $t$ strata)
 
 λ = 5
 
@@ -151,17 +150,24 @@ Smooth fiber of $X_0(12)(\mathbb{F}_{13^4})$ | $t=322$, $D_K=-660$, $m_0=4$, siz
 | 4 | 4    | (1, 12)   | 1           | 1               | 16            |
 
 #### 3.3.3 Trace
-Compute Frobenius trace on the space of cusp forms of weight $k$ and level $N$ via
-```python
-X1(12).F(13**3).tr_fq(k)
-```
-For an instantiated $X_i(N)(\mathbb{F}_q)$ we compute trace via the formula
+For an instantiated $X_i(N)(\mathbb{F}_q)$, the library compute Frobenius trace on the space of cusp forms of weight $k$ and level $N$ via the formula
 ```math
 \mathrm{tr\_fq}(k)=
 -\sum_{t^2 \leq 4q} h_k(t,q,k-2)\cdot\#\mathrm{fiber}(t)
 -\sum_{t^2 = 1} t^{k}\cdot\#\mathrm{fiber}(t),
 ```
-Here $h_k(t,q,m)$ denotes the complete homogeneous polynomial used above (implemented as `hk(t,q,k)` in `xnfq.moduli.fq.curve`).
+```python
+trace_rec = X1(12).F(13**3).tr_fq(k)
+```
+Returs the trace decomposed as
+```python
+class TrFqTraceRecord:
+    val: int
+    smooth: int = 0
+    cusp: int = 0
+    eps0: int = 0
+```
+where $\varepsilon_0$ is correction term $q+1$ (only for $k-2 = 0$)
 
 #### 3.3.3.1 Example : Basic usage
 ```bash
@@ -172,7 +178,7 @@ python examples/tr_fq.py -p 43 -N 11 -k 2 --type 1
 python examples/tr_fq.py -p 10000 --range 5 -N 1 -k 12 --type 1 --use-pari
 ```
 
-Recovering coefficients for the Ramanujan tau function (k=12).
+Recovering coefficients for the Ramanujan tau function.
 
 | p     | trace                       | smooth                      | cusp |
 |:-----:|:---------------------------:|:---------------------------:|:----:|
@@ -188,13 +194,10 @@ Computed 5 traces in 0.286272s
 ```bash
 python examples/tr_fq.py -p 13 -N 5 -k 2 --sage
 ```
-If `--sage` is given and Sage is available, `tr_fq.py` will attempt a reference trace per-prime (only for prime fields `n==1`). When `--sage` is used the table includes two extra columns showing the Sage reference trace and the absolute error. WARNING: The sage computation is very slow and is not feasable for $p > 100$ or $N > 20$
+If `--sage` is given (and Sage is available), `tr_fq.py` will attempt a naive computation of the trace via the full cusp form (only for prime fields `n==1`), and display a comparison of the results per prime. WARNING: The sage method is very slow and is not feasable for $p > 100$ or $N > 20$
 
 ## 04. Examples
-
-This repository includes a set of example scripts under the `examples/` folder. Below is a concise, organized guide to the common examples, their arguments, and recommended usage.
-
-Common CLI arguments (supported by most examples):
+Common CLI arguments
 
 ```bash
 -N <int>      # level N
@@ -208,14 +211,14 @@ Common CLI arguments (supported by most examples):
 ```
 
 ### 04.1 Base
-- `examples/xnfq_count.py` — point counts for a given level/field:
+- `examples/xnfq_count.py` — point counts for $q, N$
 
-- `examples/xnfq_structure.py` — detailed structure report for a single curve/fiber:
+- `examples/xnfq_structure.py` — detailed structure report over $q, N$
 
-- `examples/tr_fq.py` — compute canonical `tr_fq(k)` for a single F_q specialization:
+- `examples/tr_fq.py` — compute trace for $q, N, k$
 
 ### 04.2 Interactive / plotting
-- `examples/xnfq_interactive.py` — Probe the distribution of level structures varying $N$ and extention field $p^n$, normalized fiber count plots by lattice $D_K$ (smooth) and $d$ (cusps)
+- `examples/xnfq_interactive.py` — Probe the distribution of level structures varying $N$ and extention field, normalized fiber count plots by lattice $D_K$ (smooth) and $d$ (cusps)
 
 ![Smooth and cusp fiber counts](Figure_1.png)
 
@@ -225,7 +228,8 @@ Common CLI arguments (supported by most examples):
 
 
 ## 05. TODO
-
 - Add precomputed class numbers database.
+- Implement automatic LMBFD API verification instead of Sage
 - Probe individual lattice structures $(N, \pi-\lambda)$ to recover isogeny graphs.
+- Implement Quaternion Lattice forms (for supersingular graph structure)
 - Embed lattice orders $\mathbb{Z} \oplus \mathbb{Z}\tau$ into the full modular curve $\mathbb{H} \setminus \Gamma$.

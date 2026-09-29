@@ -51,3 +51,11 @@ class SmoothFiberRecordFq(FiberRecordFq):
 class CuspFiberRecordFq(FiberRecordFq):
     """Serializable summary of a cusp fiber over Fq."""
     kind: str = "cusp"
+
+
+@dataclass(frozen=True)
+class TrFqTraceRecord:
+    val: int
+    smooth: int = 0
+    cusp: int = 0
+    eps0: int = 0

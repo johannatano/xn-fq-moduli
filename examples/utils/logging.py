@@ -4,14 +4,9 @@ from typing import Callable
 
 from .data import ResultData
 
-# Do not depend on tqdm: always use the built-in minimal progress implementation.
 _tqdm = None
 
-
 class _DummyTqdm:
-    """Minimal console progress that supports both iterable-wrapping and
-    manual update usage. Prints in-place and clears shorter messages."""
-
     def __init__(self, iterable=None, total=None, desc=None, **kwargs):
         self._iterable = iterable
         self.total = total

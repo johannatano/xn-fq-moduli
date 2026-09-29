@@ -54,7 +54,6 @@ def parse_example_args(
         import sys
 
         provided = set(sys.argv[1:])
-
         # mapping from attribute name (dest) to option tokens to check
         opt_map = {
             "p": ("-p", "--p"),
@@ -70,5 +69,39 @@ def parse_example_args(
             toks = opt_map.get(key, (f"--{key}",))
             if not any(tok in provided for tok in toks):
                 setattr(args, key, val)
+    
+        # Determine which option flags were present on the command line so
+        # callers can distinguish "not provided" from the parser's defaults.
+        import sys
+    
+        provided_tokens = set(sys.argv[1:])
+        # mapping from attribute name (dest) to option tokens
+        opt_map = {
+            "p": ("-p", "--p"),
+            "n": ("-n", "--n"),
+            "N": ("-N", "--N"),
+            "type": ("-type", "--type"),
+            "range": ("--range",),
+            "k": ("-k",),
+            "sage": ("--sage",),
+        }
+        provided_dest = {key for key, toks in opt_map.items() if any(tok in provided_tokens for tok in toks)}
+    
+        # attach the set of provided dest names so callers may check presence
+        setattr(args, "_provided", provided_dest)
+    
+        # If overrides supplied, apply them only when the corresponding
+        # option was not provided on the command line.
+        if overrides:
+            for key, val in overrides.items():
+                if key not in provided_dest:
+                    setattr(args, key, val)
+
+    if include_prime_range:
+        if args.range is not None:
+            from utils.primes import next_primes
+            args.primes = next_primes(int(args.p), max(1, int(args.range)))
+        else:
+            args.primes = [int(args.p)]
 
     return args

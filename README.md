@@ -7,7 +7,7 @@ Python software for counting points and studying the structure of modular curves
 - [02. Installation](#02-installation)
 - [03. Documentation](#03-documentation)
 - [04. Examples](#04-examples)
-- [05. TODO](#05-todo)
+- [05. TODO](#05-todo--future-work)
 
 ## 01. Overview
 The main goal of this project is to study $\mathbb F_q$-rational points $(E,\gamma)$ on modular curves, where $E$ is a generalized elliptic curve and $\gamma$ is a level $N$ structure of unspecified type. By sending

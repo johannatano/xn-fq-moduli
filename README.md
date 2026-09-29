@@ -32,7 +32,7 @@ Optional PARI support for faster computations over large $q$ can be installed wi
 ```bash
 python -m pip install -e ".[pari]"
 ```
-when PARI support is enabled, pass `--use-pari` to any example and integer factorization and class number computations is routed via PARI
+pass `--use-pari` to any example for optimized integer factorization and class number computations
 
 ```bash
 python examples/xnfq_count.py --use-pari
@@ -44,15 +44,14 @@ For determining the structures of given level type, we use a universal model for
 ```python
 from xnfq.moduli import Gamma0, Gamma1, Gamma2, Gamma
 N = 11
-# Gamma0: subgroup of upper-triangular matrix of any eigenvalue
-Gamma0(N)
-# Gamma1: subgroup of upper-triangular matrix of eigenvalue 1
-Gamma1(N)
-# Gamma2: subgroup of scalar matrix eigenvalue 1
-Gamma2(N)
+# types
+Gamma0(N) # shape: upper-triangular, eigenvalues: any
+Gamma1(N) # shape: upper-triangular, eigenvalues: [1]
+Gamma2(N) # shape: scalar, eigenvalues: [1]
+
 # convenience factory
 gamma = Gamma(N, type=1)  # returns Gamma1(N)
-gamma = Gamma(N)          # defaults to full level (Gamma2)
+gamma = Gamma(N)          # returns Gamma2(N)
 ```
 ### 3.2 Modular Curve
 The main modular curve object is constructed as a generic moduli problem, and then specialized to given finite field
@@ -60,19 +59,15 @@ The main modular curve object is constructed as a generic moduli problem, and th
 from xnfq.moduli.level_structures import Gamma
 from xnfq.moduli.modular_curve import X, X0, X1
 N = 13
-# General constructor
+# general constructor
 mod_curve = ModularCurve(Gamma(N, type=1))
-# Set base field
-mod_curve.over(p=5, n=2)
+mod_curve.over(p=5, n=2) # Set base field
 
-# Convenience: set base field using full field size `q = p**n`
-# (equivalent to `over(p,n)`)
-mod_curve.F(5**2)  # same as mod_curve.over(5, 2)
-
-# Convenience wrappers
-X0(N) # ModularCurve(Gamma(N, type=0)) 
-X1(N) # ModularCurve(Gamma(N, type=1)) 
-X(N) # ModularCurve(Gamma(N, type=2))
+# convenience factory
+mod_curve.F(5**2)  # returns mod_curve.over(5, 2)
+X0(N) # returns ModularCurve(Gamma(N, type=0)) 
+X1(N) # returns ModularCurve(Gamma(N, type=1)) 
+X(N) # returns ModularCurve(Gamma(N, type=2))
 
 ```
 ### 3.3 Methods

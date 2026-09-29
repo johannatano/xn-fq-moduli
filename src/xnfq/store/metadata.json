@@ -1,8 +1,0 @@
-{
-  "file": "classnb.db",
-  "max_d": 10000000,
-  "build_command": "python scripts/build_db.py --max-d 10000000",
-  "build_date": "2026-09-29",
-  "size_bytes": 171683840,
-  "sha256": "38a861c3cf587da820abcff2341920835fd338d77e1744a90e9b3f68a2630c42"
-}

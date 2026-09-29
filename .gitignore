@@ -215,4 +215,5 @@ __marimo__/
 .streamlit/secrets.toml
 
 *.lmfdb_cache
-src/xnfq/store/*
+src/xnfq/store/classnb.db
+src/xnfq/store/release/*

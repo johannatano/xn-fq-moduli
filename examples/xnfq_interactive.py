@@ -31,7 +31,7 @@ def _prime_choices(stop: int) -> list[int]:
 
 
 PRIME_CHOICES = _prime_choices(97)
-MAX_Q = 10**3 # change to size of installed DB
+MAX_Q = 10**6 # change to size of installed DB
 
 class XNFqPlotView(Dashboard):
     figsize = (8.0, 3.0)

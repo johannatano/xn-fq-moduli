@@ -31,7 +31,7 @@ def _prime_choices(stop: int) -> list[int]:
 
 
 PRIME_CHOICES = _prime_choices(97)
-MAX_Q = 10_000_000 # gate to automatically lower n if we are above to prevent hangups
+MAX_Q = 10**3 # change to size of installed DB
 
 class XNFqPlotView(Dashboard):
     figsize = (8.0, 3.0)
@@ -45,13 +45,9 @@ class XNFqPlotView(Dashboard):
 
     def params(self):
         params = []
-        if self.initial_p in PRIME_CHOICES:
-            params.append(Param("p", 2, 97, self.initial_p, step=1, label="p", choices=PRIME_CHOICES))
-        else:
-            params.append(Param("p", 2, max(self.initial_p, 97), self.initial_p, step=1, label="p"))
-
-        params.append(Param("n", 1, max(8, self.initial_n), self.initial_n, step=1, label="n"))
-        params.append(Param("N", 1, max(100, self.initial_N), self.initial_N, step=1, label="level"))
+        params.append(Param("p", 2, MAX_Q, self.initial_p, step=1, label="p"))
+        params.append(Param("n", 1, max(20, self.initial_n), self.initial_n, step=1, label="n"))
+        params.append(Param("N", 1, max(100_000_000, self.initial_N), self.initial_N, step=1, label="level"))
         params.append(Param("type", 0, 2, self.initial_type, step=1, label=r"$\Gamma$"))
         return params
 
@@ -184,7 +180,6 @@ class XNFqPlotView(Dashboard):
             ax.set_xlabel("$D_K$")
             ax.tick_params(axis="y", left=False, labelleft=False)
             ax.grid(color="grey", linewidth=.5)
-            
 
             summary = (
                 f"total={yn_count}"
@@ -216,7 +211,7 @@ class XNFqPlotView(Dashboard):
         ax.set_xlabel("d")
         ax.tick_params(axis="y", left=False, labelleft=False)
         ax.grid(color="grey", linewidth=.5)
-        
+
         summary = (
             f"total={cusp_count}"
         )

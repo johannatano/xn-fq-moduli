@@ -37,7 +37,7 @@ class HeckeTraceInteractive(Dashboard):
 
     def params(self):
         return [
-            Param("N", 1, 10_000, self.initial_N, step=1, label="level"),
+            Param("N", 1, 100_000, self.initial_N, step=1, label="level"),
             Param("k", 2, 10_000, self.initial_k, step=1, label="weight"),
             Param("type", 0, 2, self.initial_type, step=1, label=r"$\Gamma$"),
         ]

@@ -220,11 +220,11 @@ Common CLI arguments
 ### 04.2 Interactive / plotting
 - `examples/xnfq_interactive.py` — Probe the distribution of level structures varying $N$ and extention field, normalized fiber count plots by lattice $D_K$ (smooth) and $d$ (cusps)
 
-![Smooth and cusp fiber counts](Figure_1.png)
+![Smooth and cusp fiber counts](examples/export/Figure_1.png)
 
 - `examples/tr_tp_interactive.py` — Interactive prime-range trace plot, vary weight $k$, level $N$ and step through primes, recovering Hecke traces
 
-![Hecke trace](Figure_2.png)
+![Hecke trace](examples/export/Figure_2.png)
 
 
 ## 05. TODO / Future work
